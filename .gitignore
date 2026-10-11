@@ -1,0 +1,18 @@
+# Virtual environments
+vision/
+.venv/
+venv/
+
+# Herramienta de calibración de la cátedra (cada uno la clona por su cuenta)
+i308-calib/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
