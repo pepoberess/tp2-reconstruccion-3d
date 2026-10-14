@@ -1,0 +1,6 @@
+MARKER_TYPE: "charuco"
+DICTIONARY_TYPE: 5X5_100
+SQUARES_X: 9
+SQUARES_Y: 13
+SQUARE_LENGTH: 42.0 # in millimeters
+MARKER_LENGTH: 31.5 # in millimeters
