@@ -36,7 +36,7 @@ python pipeline/run_pipeline.py configs/grupo.yaml                         # dat
 
 `tp2_reconstruccion.ipynb` recorre el mismo pipeline paso a paso (llama a las funciones de
 `pipeline/`) y muestra la figura de cada etapa. Para abrirlo en Colab:
-`File → Open notebook → GitHub` y pegar la URL del repo (branch `cami-pipeline`). La primera
+`File → Open notebook → GitHub` y pegar la URL del repo (branch `cami`). La primera
 celda clona el repo e instala las dependencias. En Colab usa SGBM por defecto (CREStereo en CPU
 tarda ~15 min); se puede forzar con `USE_CRESTEREO = True`.
 
