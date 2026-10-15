@@ -20,3 +20,10 @@ Thumbs.db
 # Salidas pesadas del pipeline (se regeneran)
 output/*/intermediate/
 output/*/stereo_maps.pkl
+
+# Modelos de CREStereo (se bajan, ~25 MB c/u)
+models/
+
+# Logs de corridas y .ply del dataset de ejemplo de la cátedra (se regeneran)
+output/*.log
+output/stereo_budha_charuco/*.ply

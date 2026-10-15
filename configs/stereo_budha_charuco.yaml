@@ -18,6 +18,16 @@ mono_init: false
 
 rectify_alpha: 0         # 0: recorta zonas negras; 1: conserva todos los píxeles
 
+# Método de disparidad:
+#   sgbm:      clásico de OpenCV, ~0.1 s por par
+#   crestereo: red neuronal (módulo `disparity` de la cátedra), ~15 s por par en CPU.
+#              Las disparidades se cachean en output/<x>/intermediate/.
+disparity_method: sgbm
+crestereo:
+  models_dir: models      # el .onnx se baja ahí (ver README)
+  shape: 1280x720
+  iterations: 10
+
 sgbm:                     # ver pipeline/stereo.py (DEFAULT_SGBM)
   numDisparities: 192
   blockSize: 5
@@ -44,6 +54,13 @@ outliers:
   nb_neighbors: 30
   std_ratio: 1.5
 largest_cluster_eps: 5.0  # mm; null para no usar DBSCAN
+
+# Opcional: malla con Poisson (null para no generarla)
+poisson:
+  depth: 8                # profundidad del octree (más alto = más detalle)
+  normal_radius: 5.0      # mm, vecindad para estimar normales
+  density_quantile: 0.05  # descarta el 5% de vértices con menos soporte
+  target_triangles: 200000  # simplificación final
 
 # tamaño real del objeto (si lo midieron con regla), para el error relativo
 real_height_mm: null

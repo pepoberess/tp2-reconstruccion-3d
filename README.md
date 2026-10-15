@@ -14,22 +14,44 @@ pip install -r requirements.txt
 
 Probado con Python 3.11 en macOS (arm64).
 
+Para usar CREStereo (`disparity_method: crestereo`) hace falta el modelo ONNX (~25 MB). El
+módulo de la cátedra lo baja solo la primera vez; si falla por certificados SSL (pasa con el
+Python de python.org en macOS), bajarlo a mano:
+
+```bash
+mkdir -p models
+curl -L -o models/crestereo_combined_iter10_720x1280.onnx \
+  https://github.com/nburrus/stereodemo/releases/download/v0.1-crestereo/crestereo_combined_iter10_720x1280.onnx
+```
+
 ## Uso
 
 ```bash
 python pipeline/run_pipeline.py configs/stereo_budha_charuco.yaml          # corre todo
 python pipeline/run_pipeline.py configs/stereo_budha_charuco.yaml --show   # + visores Open3D
+python pipeline/run_pipeline.py configs/grupo.yaml                         # dataset propio (CREStereo, ~17 min la 1ra vez)
 ```
+
+### Notebook / Google Colab
+
+`tp2_reconstruccion.ipynb` recorre el mismo pipeline paso a paso (llama a las funciones de
+`pipeline/`) y muestra la figura de cada etapa. Para abrirlo en Colab:
+`File → Open notebook → GitHub` y pegar la URL del repo (branch `cami-pipeline`). La primera
+celda clona el repo e instala las dependencias. En Colab usa SGBM por defecto (CREStereo en CPU
+tarda ~15 min); se puede forzar con `USE_CRESTEREO = True`.
+
+Localmente: `pip install jupyter` en el `.venv` y `jupyter notebook tp2_reconstruccion.ipynb`.
 
 Salidas en `output/<dataset>/`:
 
 | archivo | contenido |
 |---|---|
 | `stereo_calibration.pkl`, `stereo_maps.pkl` | calibración y mapas de rectificación (mismo formato que `calib-stereo`) |
-| `figures/` | figuras para el informe (rectificación, disparidad, pose, cámaras, nube final) |
+| `figures/` | figuras para el informe (detección, error por vista, rectificación, disparidad, SGBM vs CREStereo, pose, error PnP por captura, cámaras, etapas de optimización, nube final, malla) |
 | `reconstruction.ply` | **nube final optimizada (entregable)**, PLY binario |
+| `reconstruction_mesh.ply` | malla por Poisson (opcional del enunciado) |
 | `summary.json` | parámetros de calibración, error RMS, poses, puntos por etapa, medición |
-| `intermediate/` | nubes pesadas de la escena completa (no se entregan) |
+| `intermediate/` | nubes de la escena completa y disparidades CREStereo cacheadas (no se entregan) |
 
 ## Estructura
 
@@ -37,14 +59,15 @@ Salidas en `output/<dataset>/`:
 pipeline/
   dataset.py        lectura de pares left/right y metadatos (checkerboard.txt, markers.yaml)
   calibration.py    4.1  findChessboardCorners, calibrateCamera, stereoCalibrate, stereoRectify, initUndistortRectifyMap
-  stereo.py         4.2  SGBM + reprojectImageTo3D con Q
+  stereo.py         4.2  SGBM o CREStereo + reprojectImageTo3D con Q
   pose.py           4.2  ChArUco / checkerboard + solvePnP + Rodrigues, transformación local -> mundo
-  fusion.py         4.3  caja (OrientedBoundingBox), voxel, plano RANSAC, outliers, DBSCAN, medición
+  fusion.py         4.3  caja (OrientedBoundingBox), voxel, plano RANSAC, outliers, DBSCAN, Poisson, medición
   aruco.py          módulo de la cátedra (tutorial 7)
   calib.py          módulo de la cátedra (tutorial 6): board_points, detect_board, draw_checkerboard, np_print
   run_pipeline.py   orquesta todo
 configs/
   stereo_budha_charuco.yaml
+  grupo.yaml        dataset propio (peluche)
 ```
 
 ## Decisiones del pipeline
@@ -54,8 +77,14 @@ configs/
   `mono_init: true` para inicializar con `calibrateCamera` por cámara; con este dataset
   da exactamente el mismo resultado.
 - **Rectificación**: `alpha=0` (sin bordes negros).
-- **Disparidad**: `StereoSGBM` (modo 3WAY). Con f ≈ 600 px y baseline ≈ 60 mm,
-  `d = f·B/Z` da ~145 px a 25 cm y ~45 px a 80 cm, por eso `numDisparities=192`.
+- **Disparidad**: dos opciones (`disparity_method`):
+  - `StereoSGBM` (modo 3WAY). Con f ≈ 600 px y baseline ≈ 60 mm, `d = f·B/Z` da ~145 px a
+    25 cm y ~45 px a 80 cm, por eso `numDisparities=192`. Rápido (~0.1 s por par).
+  - **CREStereo** (red neuronal, CVPR 2022) con el módulo `disparity` de la cátedra
+    (`code_examples/stereodemo_disp_example`), a 1280x720 y 10 iteraciones. ~15 s por par en
+    CPU; se cachea en `intermediate/`. Da una disparidad densa y mucho más limpia en zonas
+    con poca textura o con el desalineamiento vertical del dataset propio
+    (figura `03b_sgbm_vs_crestereo.png`).
 - **Pose**: se estima sobre la imagen izquierda **rectificada** con `K = P1[:, :3]` y
   sin distorsión. Así la pose queda en el mismo sistema que la nube de
   `reprojectImageTo3D` y no hace falta componer con `R1`. Correspondencias: esquinas de
@@ -66,6 +95,8 @@ configs/
   Z apunte hacia arriba desde el tablero.
 - **Optimización**: caja → voxel (1 mm) → plano del tablero por RANSAC (se sacan los puntos
   a < 8 mm) → outliers estadísticos → cluster más grande (DBSCAN).
+- **Malla (opcional)**: normales + Poisson (octree depth 8), se descartan los vértices de
+  menor densidad (superficie "inventada") y se simplifica a 200k triángulos.
 - **Medición**: alto = distancia al plano de apoyo (percentil 99.5); ancho y
   profundidad = extensión en X/Y (percentiles 0.5–99.5).
 
@@ -99,10 +130,13 @@ Peluche sobre un ChArUco 9x13 (`DICT_5X5_100`, cuadrado 42 mm, marcador 31.5 mm)
 - Calibración: 81/81 pares (checkerboard 9x6, 28 mm), RMS estéreo 1.07 px, baseline 60.70 mm
   (coincide con la calibración de `calib-stereo` en `datasets/stereo_calibration.pkl`).
 - Pose: 58/58 capturas, error de reproyección de PnP 1.5–4.3 px (mediana 2.5 px).
-- Puntos: 50.1 M → caja 7.60 M → voxel 2.21 M → plano 0.70 M → outliers 0.67 M → cluster 0.64 M.
-- `reconstruction.ply`: 17.3 MB.
-- Medición: alto ≈ 131 mm sobre el plano del tablero. Ancho/profundidad (219 x 295 mm) están
-  inflados por restos del tablero que quedan dentro de la caja (ver limitación).
+- Disparidad: **CREStereo** (con SGBM solo ~50 % de los píxeles tienen disparidad válida y el
+  tablero sale muy ruidoso; ver `03b_sgbm_vs_crestereo.png`).
+- Puntos: 100.0 M → caja 12.73 M → voxel 2.26 M → plano 0.74 M → outliers 0.71 M → cluster 0.69 M.
+- `reconstruction.ply`: 18.5 MB. `reconstruction_mesh.ply` (Poisson, 200k triángulos): 7.7 MB.
+- Medición: **alto ≈ 130 mm** sobre el plano del tablero (con SGBM daba 131 mm: la altura es
+  estable entre métodos). Ancho X ≈ 217 mm y profundidad Y ≈ 239 mm incluyen la cola extendida y
+  un resto del tablero pegado a la base (ver limitación).
 
 ### Limitación encontrada
 

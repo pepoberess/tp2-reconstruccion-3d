@@ -17,8 +17,6 @@ import sys
 
 import cv2
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -103,13 +101,13 @@ def save_rectification_figure(left, right, left_r, right_r, path, n_lines=8):
     plt.close(fig)
 
 
-def save_disparity_figure(left_r, disparity, path):
+def save_disparity_figure(left_r, disparity, path, title="disparidad [px]"):
     fig, axes = plt.subplots(1, 2, figsize=(16, 5))
     axes[0].imshow(cv2.cvtColor(left_r, cv2.COLOR_BGR2RGB))
     axes[0].set_title("left rectificada")
     d = np.where(disparity > 0, disparity, np.nan)
     im = axes[1].imshow(d, cmap="turbo")
-    axes[1].set_title("disparidad SGBM [px]")
+    axes[1].set_title(title)
     fig.colorbar(im, ax=axes[1], fraction=0.03)
     for ax in axes:
         ax.axis("off")
@@ -118,7 +116,54 @@ def save_disparity_figure(left_r, disparity, path):
     plt.close(fig)
 
 
-def save_poses_figure(pcd, poses_world, path, max_points=40000):
+def save_disparity_comparison(left_r, sgbm, cre, path):
+    """Mismo par con SGBM (clásico) y CREStereo (red neuronal), misma escala de color."""
+    vmax = np.nanpercentile(np.where(cre > 0, cre, np.nan), 99)
+    fig, axes = plt.subplots(1, 3, figsize=(20, 4.5))
+    axes[0].imshow(cv2.cvtColor(left_r, cv2.COLOR_BGR2RGB))
+    axes[0].set_title("left rectificada")
+    for ax, d, name in [(axes[1], sgbm, "SGBM"), (axes[2], cre, "CREStereo")]:
+        valid = (d > 0).mean()
+        im = ax.imshow(np.where(d > 0, d, np.nan), cmap="turbo", vmin=0, vmax=vmax)
+        ax.set_title(f"{name} ({valid:.0%} píxeles válidos)")
+    fig.colorbar(im, ax=axes[1:], fraction=0.02, label="disparidad [px]")
+    for ax in axes:
+        ax.axis("off")
+    fig.savefig(path, dpi=110, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_pnp_errors_figure(per_view, path):
+    """Error de reproyección de solvePnP en cada captura (calidad de cada pose)."""
+    idx = [v["idx"] for v in per_view]
+    err = np.array([v["pnp_reproj_error_px"] for v in per_view], dtype=float)
+    fig, ax = plt.subplots(figsize=(max(8, len(idx) * 0.22), 4))
+    ax.bar(range(len(idx)), err, color="tab:blue")
+    ax.axhline(np.nanmean(err), color="k", linestyle="--",
+               label=f"media = {np.nanmean(err):.2f} px")
+    ax.set_xticks(range(len(idx)), [str(i) for i in idx], fontsize=7)
+    ax.set_xlabel("captura")
+    ax.set_ylabel("error de reproyección PnP [px]")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+
+
+def frustum_lines(T_world_cam, K, image_size, depth):
+    """Segmentos 3D de una cámara dibujada como pirámide (centro + plano imagen a `depth` mm)."""
+    w, h = image_size
+    pixels = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=float)
+    # rayo de cada esquina de la imagen, escalado a Z = depth (sistema cámara)
+    corners = np.c_[(pixels - K[:2, 2]) / np.diag(K)[:2], np.ones(4)] * depth
+    corners = corners @ T_world_cam[:3, :3].T + T_world_cam[:3, 3]
+    center = T_world_cam[:3, 3]
+    lines = [(center, c) for c in corners]
+    lines += [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+    return lines
+
+
+def save_poses_figure(pcd, poses_world, path, K, image_size, max_points=40000):
     pts = np.asarray(pcd.points)
     cols = np.asarray(pcd.colors)
     if len(pts) > max_points:
@@ -131,9 +176,9 @@ def save_poses_figure(pcd, poses_world, path, max_points=40000):
     centers = np.array([T[:3, 3] for T in poses_world])
     ax.plot(centers[:, 0], centers[:, 1], centers[:, 2], "b.-", label="cámaras")
     for i, T in enumerate(poses_world):
-        c, z = T[:3, 3], T[:3, 2]  # centro y eje óptico
-        ax.quiver(*c, *(z * 60), color="r", linewidth=0.8)
-        ax.text(*c, str(i), fontsize=7)
+        for a, b in frustum_lines(T, K, image_size, depth=25):
+            ax.plot(*np.c_[a, b], color="r", linewidth=0.6)
+        ax.text(*T[:3, 3], str(i), fontsize=7)
     # ejes del mundo
     for v, color in zip(np.eye(3) * 100, "rgb"):
         ax.quiver(0, 0, 0, *v, color=color, linewidth=2)
@@ -158,6 +203,58 @@ def save_cloud_views(pcd, path, title, max_points=60000):
         ax.set_title(name)
         ax.set_xlabel("XYZ"[i] + " [mm]"); ax.set_ylabel("XYZ"[j] + " [mm]")
     fig.suptitle(f"{title} ({len(pcd.points):,} puntos)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+
+
+def save_stages_figure(clouds, path, max_points=40000):
+    """Nube después de cada etapa de optimización, vista lateral 3D, con la cantidad de puntos."""
+    names = {"bounding_box": "bounding box", "voxel": "voxel downsample",
+             "plane_removal": "sin plano del tablero", "outliers": "sin outliers",
+             "largest_cluster": "cluster principal"}
+    keys = [k for k in names if k in clouds]
+    fig = plt.figure(figsize=(4.5 * len(keys), 5))
+    rng = np.random.default_rng(0)
+    for k, key in enumerate(keys):
+        pts = np.asarray(clouds[key].points)
+        cols = np.asarray(clouds[key].colors)
+        n = len(pts)
+        if n > max_points:
+            sel = rng.choice(n, max_points, replace=False)
+            pts, cols = pts[sel], cols[sel]
+        ax = fig.add_subplot(1, len(keys), k + 1, projection="3d")
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=cols, s=0.3)
+        ax.set_box_aspect(np.ptp(pts, axis=0))
+        ax.view_init(elev=25, azim=-60)
+        ax.set_title(f"{k + 1}. {names[key]}\n{n:,} puntos", fontsize=10)
+        ax.set_xticklabels([]); ax.set_yticklabels([]); ax.set_zticklabels([])
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+
+
+def save_mesh_figure(mesh, path, max_triangles=60000):
+    """Render de la malla con matplotlib (vista en perspectiva, color por vértice)."""
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+    if len(mesh.triangles) > max_triangles:
+        mesh = mesh.simplify_quadric_decimation(max_triangles)
+    v = np.asarray(mesh.vertices)
+    t = np.asarray(mesh.triangles)
+    colors = np.asarray(mesh.vertex_colors)[t].mean(axis=1)
+
+    fig = plt.figure(figsize=(14, 6))
+    for k, azim in enumerate([-60, 30, 120]):
+        ax = fig.add_subplot(1, 3, k + 1, projection="3d")
+        ax.add_collection3d(Poly3DCollection(v[t], facecolors=colors, linewidths=0))
+        ax.set_xlim(v[:, 0].min(), v[:, 0].max())
+        ax.set_ylim(v[:, 1].min(), v[:, 1].max())
+        ax.set_zlim(v[:, 2].min(), v[:, 2].max())
+        ax.set_box_aspect(np.ptp(v, axis=0))
+        ax.view_init(elev=20, azim=azim)
+        ax.axis("off")
+    fig.suptitle(f"malla Poisson ({len(t):,} triángulos)")
     fig.tight_layout()
     fig.savefig(path, dpi=110)
     plt.close(fig)
@@ -209,6 +306,28 @@ def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
     return calibration, maps
 
 
+def method_name(cfg):
+    return "CREStereo" if cfg.get("disparity_method", "sgbm") == "crestereo" else "SGBM"
+
+
+def compute_disparity(cfg, left_r, right_r, idx, inter_dir):
+    """SGBM (rápido) o CREStereo (red neuronal, ~15 s por par; se cachea en intermediate/)."""
+    if cfg.get("disparity_method", "sgbm") != "crestereo":
+        return stereo.compute_disparity(cv2.cvtColor(left_r, cv2.COLOR_BGR2GRAY),
+                                        cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY), cfg.get("sgbm"))
+
+    cre = cfg.get("crestereo", {})
+    cache = os.path.join(inter_dir, f"disp_crestereo_{idx}.npy")
+    if os.path.exists(cache):
+        return np.load(cache).astype(np.float32)
+    disparity = stereo.compute_disparity_cre(
+        left_r, right_r, resolve(cre.get("models_dir", "models")),
+        shape=cre.get("shape", "1280x720"), iterations=cre.get("iterations", 10),
+    )
+    np.save(cache, disparity.astype(np.float16))
+    return disparity
+
+
 def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
     print("\n[4.2] Disparidad, nube local y pose de cada captura")
     captures_dir = os.path.join(dataset_dir, "captures")
@@ -228,11 +347,7 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
         left_r, right_r = stereo_calib.rectify_pair(left, right, maps)
 
         # 1. stereo matching
-        disparity = stereo.compute_disparity(
-            cv2.cvtColor(left_r, cv2.COLOR_BGR2GRAY),
-            cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY),
-            cfg.get("sgbm"),
-        )
+        disparity = compute_disparity(cfg, left_r, right_r, idx, inter_dir)
 
         # 2. nube local (cámara izquierda rectificada)
         points, colors = stereo.disparity_to_points(
@@ -264,7 +379,14 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
         if n == 0:
             save_rectification_figure(left, right, left_r, right_r,
                                       os.path.join(fig_dir, "02_rectificacion_captura.png"))
-            save_disparity_figure(left_r, disparity, os.path.join(fig_dir, "03_disparidad.png"))
+            save_disparity_figure(left_r, disparity, os.path.join(fig_dir, "03_disparidad.png"),
+                                  title=f"disparidad {method_name(cfg)} [px]")
+            if method_name(cfg) == "CREStereo":
+                # comparación con el método clásico, para el informe
+                sgbm = stereo.compute_disparity(cv2.cvtColor(left_r, cv2.COLOR_BGR2GRAY),
+                                                cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY), cfg.get("sgbm"))
+                save_disparity_comparison(left_r, sgbm, disparity,
+                                          os.path.join(fig_dir, "03b_sgbm_vs_crestereo.png"))
             cv2.imwrite(os.path.join(fig_dir, "04_pose_pnp.jpg"),
                         pose_mod.draw_pose(left_r, p["rvec"], p["tvec"], K_rect, axis_len=axis_len))
             local = fusion.make_pcd(points, colors).voxel_down_sample(2.0)
@@ -275,6 +397,7 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
 
 
 def main():
+    matplotlib.use("Agg")  # solo figuras a archivo (el notebook importa este módulo y muestra inline)
     parser = argparse.ArgumentParser()
     parser.add_argument("config")
     parser.add_argument("--show", action="store_true", help="abrir visores de Open3D")
@@ -296,24 +419,46 @@ def main():
     print("\n[4.3] Fusión y optimización")
     scene_preview = pcd.voxel_down_sample(3.0)
     o3d.io.write_point_cloud(os.path.join(inter_dir, "scene_preview.ply"), scene_preview)
-    save_poses_figure(scene_preview.crop(o3d.geometry.AxisAlignedBoundingBox(
-        [-200, -568, -50], [463, 200, 400])), poses_world, os.path.join(fig_dir, "05_poses_camaras.png"))
+    # escena alrededor de la caja del objeto (+20 cm) para ver cámaras y tablero
+    margin = np.array([200, 200, 50])
+    scene_crop = scene_preview.crop(o3d.geometry.AxisAlignedBoundingBox(
+        np.array(cfg["box_min"]) - margin, np.array(cfg["box_max"]) + margin))
+    save_poses_figure(scene_crop, poses_world, os.path.join(fig_dir, "05_poses_camaras.png"),
+                      K_rect, calibration["image_size"])
+    save_pnp_errors_figure(per_view, os.path.join(fig_dir, "04b_error_pnp_por_captura.png"))
 
     out = cfg["outliers"]
+    stage_clouds = {}
     final, obb, plane, stages = fusion.optimize(
         pcd, cfg["box_min"], cfg["box_max"], cfg["voxel_size"],
         out["nb_neighbors"], out["std_ratio"], plane_margin=cfg.get("plane_margin"),
+        clouds=stage_clouds,
     )
     if cfg.get("largest_cluster_eps"):
         final = fusion.keep_largest_cluster(final, cfg["largest_cluster_eps"])
         stages["largest_cluster"] = len(final.points)
+        stage_clouds["largest_cluster"] = final
         print(f"  {'cluster':>13}: {stages['largest_cluster']:>10,} puntos")
+    save_stages_figure(stage_clouds, os.path.join(fig_dir, "06a_etapas_optimizacion.png"))
 
     save_cloud_views(final, os.path.join(fig_dir, "06_nube_final.png"), "nube final optimizada")
 
     ply_path = os.path.join(out_dir, "reconstruction.ply")
     o3d.io.write_point_cloud(ply_path, final, write_ascii=False)
     print(f"  guardado {ply_path} ({os.path.getsize(ply_path) / 1e6:.1f} MB)")
+
+    if cfg.get("poisson"):
+        print("\n[opcional] Malla con Poisson")
+        pc = cfg["poisson"]
+        mesh = fusion.poisson_mesh(final, depth=pc.get("depth", 8),
+                                   normal_radius=pc.get("normal_radius", 5.0),
+                                   density_quantile=pc.get("density_quantile", 0.05),
+                                   target_triangles=pc.get("target_triangles", 200_000))
+        mesh_path = os.path.join(out_dir, "reconstruction_mesh.ply")
+        o3d.io.write_triangle_mesh(mesh_path, mesh)
+        print(f"  {len(mesh.triangles):,} triángulos -> {mesh_path} "
+              f"({os.path.getsize(mesh_path) / 1e6:.1f} MB)")
+        save_mesh_figure(mesh, os.path.join(fig_dir, "07_malla_poisson.png"))
 
     print("\n[5] Medición métrica")
     m = fusion.measure(final, plane)

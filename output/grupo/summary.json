@@ -161,7 +161,7 @@
   "views": [
     {
       "idx": 0,
-      "points": 751606,
+      "points": 1467128,
       "pose_method": "pnp",
       "pnp_points": 177,
       "pnp_reproj_error_px": 2.1465394496917725,
@@ -173,7 +173,7 @@
     },
     {
       "idx": 1,
-      "points": 526532,
+      "points": 930316,
       "pose_method": "pnp",
       "pnp_points": 72,
       "pnp_reproj_error_px": 2.5355606079101562,
@@ -185,7 +185,7 @@
     },
     {
       "idx": 2,
-      "points": 719858,
+      "points": 1458520,
       "pose_method": "pnp",
       "pnp_points": 206,
       "pnp_reproj_error_px": 3.114105701446533,
@@ -197,7 +197,7 @@
     },
     {
       "idx": 3,
-      "points": 960604,
+      "points": 1689668,
       "pose_method": "pnp",
       "pnp_points": 246,
       "pnp_reproj_error_px": 2.887665033340454,
@@ -209,7 +209,7 @@
     },
     {
       "idx": 4,
-      "points": 915422,
+      "points": 1521405,
       "pose_method": "pnp",
       "pnp_points": 270,
       "pnp_reproj_error_px": 2.1144754886627197,
@@ -221,7 +221,7 @@
     },
     {
       "idx": 5,
-      "points": 899711,
+      "points": 1500718,
       "pose_method": "pnp",
       "pnp_points": 258,
       "pnp_reproj_error_px": 2.0209226608276367,
@@ -233,7 +233,7 @@
     },
     {
       "idx": 6,
-      "points": 912889,
+      "points": 1502572,
       "pose_method": "pnp",
       "pnp_points": 242,
       "pnp_reproj_error_px": 2.0007169246673584,
@@ -245,7 +245,7 @@
     },
     {
       "idx": 7,
-      "points": 968308,
+      "points": 1592901,
       "pose_method": "pnp",
       "pnp_points": 258,
       "pnp_reproj_error_px": 2.1048998832702637,
@@ -257,7 +257,7 @@
     },
     {
       "idx": 8,
-      "points": 808777,
+      "points": 1251969,
       "pose_method": "pnp",
       "pnp_points": 230,
       "pnp_reproj_error_px": 2.3112919330596924,
@@ -269,7 +269,7 @@
     },
     {
       "idx": 9,
-      "points": 798343,
+      "points": 1346238,
       "pose_method": "pnp",
       "pnp_points": 183,
       "pnp_reproj_error_px": 1.8265609741210938,
@@ -281,7 +281,7 @@
     },
     {
       "idx": 10,
-      "points": 708118,
+      "points": 1318084,
       "pose_method": "pnp",
       "pnp_points": 188,
       "pnp_reproj_error_px": 1.7559882402420044,
@@ -293,7 +293,7 @@
     },
     {
       "idx": 11,
-      "points": 648276,
+      "points": 1272758,
       "pose_method": "pnp",
       "pnp_points": 215,
       "pnp_reproj_error_px": 1.8509877920150757,
@@ -305,7 +305,7 @@
     },
     {
       "idx": 12,
-      "points": 775511,
+      "points": 1277176,
       "pose_method": "pnp",
       "pnp_points": 205,
       "pnp_reproj_error_px": 1.921807050704956,
@@ -317,7 +317,7 @@
     },
     {
       "idx": 13,
-      "points": 866916,
+      "points": 1348218,
       "pose_method": "pnp",
       "pnp_points": 216,
       "pnp_reproj_error_px": 2.0719335079193115,
@@ -329,7 +329,7 @@
     },
     {
       "idx": 14,
-      "points": 980331,
+      "points": 1779749,
       "pose_method": "pnp",
       "pnp_points": 122,
       "pnp_reproj_error_px": 2.768620014190674,
@@ -341,7 +341,7 @@
     },
     {
       "idx": 15,
-      "points": 979306,
+      "points": 1769325,
       "pose_method": "pnp",
       "pnp_points": 144,
       "pnp_reproj_error_px": 2.586228847503662,
@@ -353,7 +353,7 @@
     },
     {
       "idx": 16,
-      "points": 575868,
+      "points": 1928454,
       "pose_method": "pnp",
       "pnp_points": 111,
       "pnp_reproj_error_px": 3.6883952617645264,
@@ -365,7 +365,7 @@
     },
     {
       "idx": 17,
-      "points": 682011,
+      "points": 1926347,
       "pose_method": "pnp",
       "pnp_points": 67,
       "pnp_reproj_error_px": 2.138579845428467,
@@ -377,7 +377,7 @@
     },
     {
       "idx": 18,
-      "points": 669407,
+      "points": 1681217,
       "pose_method": "pnp",
       "pnp_points": 109,
       "pnp_reproj_error_px": 2.309544801712036,
@@ -389,7 +389,7 @@
     },
     {
       "idx": 19,
-      "points": 583834,
+      "points": 1484625,
       "pose_method": "pnp",
       "pnp_points": 146,
       "pnp_reproj_error_px": 2.4454216957092285,
@@ -401,7 +401,7 @@
     },
     {
       "idx": 20,
-      "points": 606279,
+      "points": 1472767,
       "pose_method": "pnp",
       "pnp_points": 154,
       "pnp_reproj_error_px": 2.336580514907837,
@@ -413,7 +413,7 @@
     },
     {
       "idx": 21,
-      "points": 910255,
+      "points": 1771442,
       "pose_method": "pnp",
       "pnp_points": 145,
       "pnp_reproj_error_px": 2.4394497871398926,
@@ -425,7 +425,7 @@
     },
     {
       "idx": 22,
-      "points": 691775,
+      "points": 1904160,
       "pose_method": "pnp",
       "pnp_points": 181,
       "pnp_reproj_error_px": 2.8273003101348877,
@@ -437,7 +437,7 @@
     },
     {
       "idx": 23,
-      "points": 629551,
+      "points": 1437985,
       "pose_method": "pnp",
       "pnp_points": 122,
       "pnp_reproj_error_px": 3.852778673171997,
@@ -449,7 +449,7 @@
     },
     {
       "idx": 24,
-      "points": 898842,
+      "points": 1901786,
       "pose_method": "pnp",
       "pnp_points": 252,
       "pnp_reproj_error_px": 3.603769302368164,
@@ -461,7 +461,7 @@
     },
     {
       "idx": 25,
-      "points": 994106,
+      "points": 1872263,
       "pose_method": "pnp",
       "pnp_points": 251,
       "pnp_reproj_error_px": 3.050908327102661,
@@ -473,7 +473,7 @@
     },
     {
       "idx": 26,
-      "points": 1379663,
+      "points": 1894763,
       "pose_method": "pnp",
       "pnp_points": 279,
       "pnp_reproj_error_px": 1.6685916185379028,
@@ -485,7 +485,7 @@
     },
     {
       "idx": 27,
-      "points": 1495177,
+      "points": 1949925,
       "pose_method": "pnp",
       "pnp_points": 279,
       "pnp_reproj_error_px": 1.600899577140808,
@@ -497,7 +497,7 @@
     },
     {
       "idx": 28,
-      "points": 1325185,
+      "points": 1793585,
       "pose_method": "pnp",
       "pnp_points": 165,
       "pnp_reproj_error_px": 1.668605089187622,
@@ -509,7 +509,7 @@
     },
     {
       "idx": 29,
-      "points": 1232090,
+      "points": 1706275,
       "pose_method": "pnp",
       "pnp_points": 148,
       "pnp_reproj_error_px": 1.518541693687439,
@@ -521,7 +521,7 @@
     },
     {
       "idx": 30,
-      "points": 1071719,
+      "points": 1778899,
       "pose_method": "pnp",
       "pnp_points": 158,
       "pnp_reproj_error_px": 2.0205295085906982,
@@ -533,7 +533,7 @@
     },
     {
       "idx": 31,
-      "points": 1120920,
+      "points": 1986473,
       "pose_method": "pnp",
       "pnp_points": 163,
       "pnp_reproj_error_px": 2.045985698699951,
@@ -545,7 +545,7 @@
     },
     {
       "idx": 32,
-      "points": 1252291,
+      "points": 2049465,
       "pose_method": "pnp",
       "pnp_points": 155,
       "pnp_reproj_error_px": 2.9570672512054443,
@@ -557,7 +557,7 @@
     },
     {
       "idx": 33,
-      "points": 1125420,
+      "points": 2045246,
       "pose_method": "pnp",
       "pnp_points": 168,
       "pnp_reproj_error_px": 2.9028544425964355,
@@ -569,7 +569,7 @@
     },
     {
       "idx": 34,
-      "points": 1063591,
+      "points": 2050541,
       "pose_method": "pnp",
       "pnp_points": 180,
       "pnp_reproj_error_px": 2.621316432952881,
@@ -581,7 +581,7 @@
     },
     {
       "idx": 35,
-      "points": 1001118,
+      "points": 2049493,
       "pose_method": "pnp",
       "pnp_points": 161,
       "pnp_reproj_error_px": 3.0400185585021973,
@@ -593,7 +593,7 @@
     },
     {
       "idx": 36,
-      "points": 986935,
+      "points": 2048878,
       "pose_method": "pnp",
       "pnp_points": 139,
       "pnp_reproj_error_px": 2.956041097640991,
@@ -605,7 +605,7 @@
     },
     {
       "idx": 37,
-      "points": 799170,
+      "points": 1695238,
       "pose_method": "pnp",
       "pnp_points": 152,
       "pnp_reproj_error_px": 2.451221227645874,
@@ -617,7 +617,7 @@
     },
     {
       "idx": 38,
-      "points": 836293,
+      "points": 2009526,
       "pose_method": "pnp",
       "pnp_points": 187,
       "pnp_reproj_error_px": 3.6733341217041016,
@@ -629,7 +629,7 @@
     },
     {
       "idx": 39,
-      "points": 631999,
+      "points": 1638172,
       "pose_method": "pnp",
       "pnp_points": 140,
       "pnp_reproj_error_px": 3.1940650939941406,
@@ -641,7 +641,7 @@
     },
     {
       "idx": 40,
-      "points": 816651,
+      "points": 2044519,
       "pose_method": "pnp",
       "pnp_points": 164,
       "pnp_reproj_error_px": 3.433032989501953,
@@ -653,7 +653,7 @@
     },
     {
       "idx": 41,
-      "points": 767406,
+      "points": 1638945,
       "pose_method": "pnp",
       "pnp_points": 170,
       "pnp_reproj_error_px": 2.906632900238037,
@@ -665,7 +665,7 @@
     },
     {
       "idx": 42,
-      "points": 664509,
+      "points": 1379574,
       "pose_method": "pnp",
       "pnp_points": 195,
       "pnp_reproj_error_px": 2.2867188453674316,
@@ -677,7 +677,7 @@
     },
     {
       "idx": 43,
-      "points": 666405,
+      "points": 2051008,
       "pose_method": "pnp",
       "pnp_points": 187,
       "pnp_reproj_error_px": 3.6405179500579834,
@@ -689,7 +689,7 @@
     },
     {
       "idx": 44,
-      "points": 691014,
+      "points": 2030779,
       "pose_method": "pnp",
       "pnp_points": 185,
       "pnp_reproj_error_px": 4.004955768585205,
@@ -701,7 +701,7 @@
     },
     {
       "idx": 45,
-      "points": 677392,
+      "points": 2040809,
       "pose_method": "pnp",
       "pnp_points": 210,
       "pnp_reproj_error_px": 3.558290719985962,
@@ -713,7 +713,7 @@
     },
     {
       "idx": 46,
-      "points": 689025,
+      "points": 1918039,
       "pose_method": "pnp",
       "pnp_points": 163,
       "pnp_reproj_error_px": 3.2353415489196777,
@@ -725,7 +725,7 @@
     },
     {
       "idx": 47,
-      "points": 761040,
+      "points": 1992139,
       "pose_method": "pnp",
       "pnp_points": 166,
       "pnp_reproj_error_px": 2.5405173301696777,
@@ -737,7 +737,7 @@
     },
     {
       "idx": 48,
-      "points": 713206,
+      "points": 2037727,
       "pose_method": "pnp",
       "pnp_points": 164,
       "pnp_reproj_error_px": 4.293437480926514,
@@ -749,7 +749,7 @@
     },
     {
       "idx": 49,
-      "points": 739290,
+      "points": 2031464,
       "pose_method": "pnp",
       "pnp_points": 219,
       "pnp_reproj_error_px": 3.6788604259490967,
@@ -761,7 +761,7 @@
     },
     {
       "idx": 50,
-      "points": 1197194,
+      "points": 2073600,
       "pose_method": "pnp",
       "pnp_points": 248,
       "pnp_reproj_error_px": 2.371795654296875,
@@ -773,7 +773,7 @@
     },
     {
       "idx": 51,
-      "points": 698771,
+      "points": 1505792,
       "pose_method": "pnp",
       "pnp_points": 165,
       "pnp_reproj_error_px": 4.213090419769287,
@@ -785,7 +785,7 @@
     },
     {
       "idx": 52,
-      "points": 1056177,
+      "points": 1512466,
       "pose_method": "pnp",
       "pnp_points": 269,
       "pnp_reproj_error_px": 2.314607858657837,
@@ -797,7 +797,7 @@
     },
     {
       "idx": 53,
-      "points": 1210239,
+      "points": 1620236,
       "pose_method": "pnp",
       "pnp_points": 269,
       "pnp_reproj_error_px": 2.1057066917419434,
@@ -809,7 +809,7 @@
     },
     {
       "idx": 54,
-      "points": 755829,
+      "points": 1820389,
       "pose_method": "pnp",
       "pnp_points": 178,
       "pnp_reproj_error_px": 2.514676094055176,
@@ -821,7 +821,7 @@
     },
     {
       "idx": 55,
-      "points": 719890,
+      "points": 1807964,
       "pose_method": "pnp",
       "pnp_points": 145,
       "pnp_reproj_error_px": 2.483093500137329,
@@ -833,7 +833,7 @@
     },
     {
       "idx": 56,
-      "points": 785770,
+      "points": 1681656,
       "pose_method": "pnp",
       "pnp_points": 174,
       "pnp_reproj_error_px": 2.369245767593384,
@@ -845,7 +845,7 @@
     },
     {
       "idx": 57,
-      "points": 743674,
+      "points": 1751763,
       "pose_method": "pnp",
       "pnp_points": 157,
       "pnp_reproj_error_px": 2.397624969482422,
@@ -857,27 +857,27 @@
     }
   ],
   "points_per_stage": {
-    "original": 50137489,
-    "bounding_box": 7602915,
-    "voxel": 2213034,
-    "plane_removal": 703287,
-    "outliers": 665035,
-    "largest_cluster": 639389
+    "original": 100043139,
+    "bounding_box": 12732286,
+    "voxel": 2262207,
+    "plane_removal": 740161,
+    "outliers": 709974,
+    "largest_cluster": 685153
   },
   "measurement": {
-    "height_mm": 130.7439165800367,
-    "height_max_mm": 137.30202372600712,
-    "width_x_mm": 218.6579566990498,
-    "depth_y_mm": 295.00783594700516,
+    "height_mm": 130.54936814505228,
+    "height_max_mm": 134.10184839195833,
+    "width_x_mm": 216.85316978979785,
+    "depth_y_mm": 238.91887789487467,
     "aabb_dims_mm": [
-      218.6579566990498,
-      295.00783594700516,
-      121.26186088116395
+      216.85316978979785,
+      238.91887789487467,
+      117.49619325384656
     ],
     "obb_extent_mm": [
-      321.54968329438367,
-      230.41828361902333,
-      122.30819277082844
+      290.1903114623983,
+      230.02495769783118,
+      119.54298088318342
     ]
   },
   "config": {
@@ -887,6 +887,12 @@
     "maps_pkl": null,
     "mono_init": false,
     "rectify_alpha": 0,
+    "disparity_method": "crestereo",
+    "crestereo": {
+      "models_dir": "models",
+      "shape": "1280x720",
+      "iterations": 10
+    },
     "sgbm": {
       "numDisparities": 192,
       "blockSize": 5,
@@ -900,7 +906,7 @@
     ],
     "box_min": [
       140,
-      -510,
+      -450,
       -20
     ],
     "box_max": [
@@ -915,6 +921,12 @@
       "std_ratio": 1.5
     },
     "largest_cluster_eps": 5.0,
+    "poisson": {
+      "depth": 8,
+      "normal_radius": 5.0,
+      "density_quantile": 0.05,
+      "target_triangles": 200000
+    },
     "real_height_mm": null
   }
 }

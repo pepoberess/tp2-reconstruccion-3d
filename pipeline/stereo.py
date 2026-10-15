@@ -1,6 +1,12 @@
 """
 Paso 4.2 (1 y 2): disparidad sobre el par rectificado y nube de puntos local.
 """
+import contextlib
+import io
+import os
+import sys
+from pathlib import Path
+
 import cv2
 import numpy as np
 
@@ -34,6 +40,39 @@ def compute_disparity(left_rect_gray, right_rect_gray, params=None):
     # SGBM devuelve disparidad en punto fijo (x16)
     disparity = sgbm.compute(left_rect_gray, right_rect_gray).astype(np.float32) / 16.0
     return disparity
+
+
+_CRE_METHOD = None
+CATEDRA_DISPARITY_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "tp2_reconstruccion_3d", "code_examples", "stereodemo_disp_example",
+)
+
+
+def compute_disparity_cre(left_rect_bgr, right_rect_bgr, models_dir, shape="1280x720", iterations="10"):
+    """
+    Disparidad con CREStereo (red neuronal, CVPR 2022) usando el módulo `disparity`
+    de la cátedra (tutorial 6 / code_examples). La red trabaja a `shape` y el
+    módulo reescala la disparidad a la resolución original.
+    El modelo .onnx tiene que estar en `models_dir` (ver README).
+    """
+    global _CRE_METHOD
+    if _CRE_METHOD is None:
+        if CATEDRA_DISPARITY_DIR not in sys.path:
+            sys.path.insert(0, CATEDRA_DISPARITY_DIR)
+        from disparity.method_cre_stereo import CREStereo
+        from disparity.methods import Config
+
+        _CRE_METHOD = CREStereo(Config(models_path=Path(models_dir)))
+        _CRE_METHOD.parameters["Shape"].set_value(shape)
+        _CRE_METHOD.parameters["Iterations"].set_value(str(iterations))
+
+    from disparity.methods import InputPair
+
+    # la calibración del InputPair no se usa para calcular la disparidad
+    with contextlib.redirect_stdout(io.StringIO()):
+        out = _CRE_METHOD.compute_disparity(InputPair(left_rect_bgr, right_rect_bgr, None, None))
+    return out.disparity_pixels.astype(np.float32)
 
 
 def disparity_to_points(disparity, Q, left_rect_bgr, min_disparity=1.0, z_range=(50, 2000)):

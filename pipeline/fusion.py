@@ -48,25 +48,37 @@ def remove_plane(pcd, plane, margin):
 
 
 def optimize(pcd, box_min, box_max, voxel_size, nb_neighbors, std_ratio,
-             plane_margin=None, log=print):
-    """bounding box -> voxel downsample -> [plano del tablero] -> statistical outlier removal."""
+             plane_margin=None, log=print, clouds=None):
+    """
+    bounding box -> voxel downsample -> [plano del tablero] -> statistical outlier removal.
+    Si se pasa un dict en `clouds`, guarda ahí la nube resultante de cada etapa
+    (para graficar el antes/después).
+    """
     stages = {"original": len(pcd.points)}
 
     pcd, obb = crop_box(pcd, box_min, box_max)
     stages["bounding_box"] = len(pcd.points)
+    if clouds is not None:
+        clouds["bounding_box"] = pcd
 
     pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
     stages["voxel"] = len(pcd.points)
+    if clouds is not None:
+        clouds["voxel"] = pcd
 
     plane = None
     if plane_margin is not None:
         plane = fit_support_plane(pcd)
         pcd = remove_plane(pcd, plane, plane_margin)
         stages["plane_removal"] = len(pcd.points)
+        if clouds is not None:
+            clouds["plane_removal"] = pcd
         log(f"  plano RANSAC: n={np.round(plane[0], 4)}, d={plane[1]:.2f}")
 
     pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=std_ratio)
     stages["outliers"] = len(pcd.points)
+    if clouds is not None:
+        clouds["outliers"] = pcd
 
     for name, n in stages.items():
         log(f"  {name:>13}: {n:>10,} puntos")
@@ -80,6 +92,32 @@ def keep_largest_cluster(pcd, eps, min_points=20):
         return pcd
     largest = np.bincount(labels[labels >= 0]).argmax()
     return pcd.select_by_index(np.where(labels == largest)[0])
+
+
+def poisson_mesh(pcd, depth=8, normal_radius=5.0, density_quantile=0.05, target_triangles=200_000):
+    """
+    Opcional del enunciado: malla por reconstrucción de Poisson.
+    1. normales por vecindad, orientadas consistentemente
+    2. Poisson (profundidad del octree `depth`: más alto = más detalle)
+    3. se sacan los triángulos de baja densidad (Poisson "inventa" superficie
+       donde no hay puntos, sobre todo en los bordes abiertos)
+    """
+    pcd = o3d.geometry.PointCloud(pcd)
+    pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=normal_radius, max_nn=30))
+    pcd.orient_normals_consistent_tangent_plane(k=15)
+
+    with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Error):
+        mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
+    densities = np.asarray(densities)
+    mesh.remove_vertices_by_mask(densities < np.quantile(densities, density_quantile))
+
+    # recorta a la caja de la nube (Poisson cierra la superficie más allá de los datos)
+    mesh = mesh.crop(pcd.get_axis_aligned_bounding_box())
+    # simplificación (quadric decimation) para que el archivo sea manejable
+    if len(mesh.triangles) > target_triangles:
+        mesh = mesh.simplify_quadric_decimation(target_triangles)
+    mesh.compute_vertex_normals()
+    return mesh
 
 
 def measure(pcd, plane=None, low=0.5, high=99.5):
