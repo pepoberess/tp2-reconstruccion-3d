@@ -1,0 +1,49 @@
+# Configuración del pipeline para un dataset.
+# Para usar sus propias fotos: copien este archivo, cambien `dataset` (y los
+# parámetros de la caja / disparidad si hace falta) y corran:
+#   python pipeline/run_pipeline.py configs/mi_dataset.yaml
+
+# carpeta con subcarpetas calib/ y captures/ (relativa a la raíz del repo)
+dataset: tp2_reconstruccion_3d/datasets
+output: output/grupo
+
+# Si calibraron con la herramienta calib-stereo de la cátedra, apunten acá a
+# sus .pkl y se saltea la calibración. Si quedan en null, se calibra con calib/.
+calibration_pkl: null
+maps_pkl: null
+
+# true: calibrateCamera por cámara como inicialización de stereoCalibrate.
+# false: exactamente como el tutorial 6 (stereoCalibrate desde cero, flags=0).
+mono_init: false
+
+rectify_alpha: 0         # 0: recorta zonas negras; 1: conserva todos los píxeles
+
+sgbm:                     # ver pipeline/stereo.py (DEFAULT_SGBM)
+  numDisparities: 192
+  blockSize: 5
+  uniquenessRatio: 10
+  speckleWindowSize: 200
+  speckleRange: 2
+
+# rango de profundidad (mm, cámara) aceptado para la nube local
+z_range: [100, 1000]
+
+# Caja en coordenadas del MUNDO (mm). Mundo = tablero, Z hacia arriba.
+# El ChArUco mide 9x42 = 378 mm (X) por 13x42 = 546 mm (Y, hacia -Y).
+# z_min < 0 deja el tablero entero adentro, para poder ajustarle un plano.
+box_min: [140, -510, -20]
+box_max: [370, -160, 250]
+
+voxel_size: 1.0           # mm
+
+# Se ajusta el plano del tablero con RANSAC y se descartan los puntos a menos
+# de plane_margin mm de él (el tablero reconstruido tiene ~1 cm de ruido).
+# null para no sacar el plano.
+plane_margin: 15.0         # mm (más grande que en el Buda: el tablero sale más ruidoso)
+outliers:
+  nb_neighbors: 30
+  std_ratio: 1.5
+largest_cluster_eps: 5.0  # mm; null para no usar DBSCAN
+
+# tamaño real del objeto (si lo midieron con regla), para el error relativo
+real_height_mm: null

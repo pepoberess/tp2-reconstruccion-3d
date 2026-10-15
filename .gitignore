@@ -16,3 +16,7 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Salidas pesadas del pipeline (se regeneran)
+output/*/intermediate/
+output/*/stereo_maps.pkl

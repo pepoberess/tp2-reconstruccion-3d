@@ -1,0 +1,63 @@
+"""
+Paso 4.2 (1 y 2): disparidad sobre el par rectificado y nube de puntos local.
+"""
+import cv2
+import numpy as np
+
+# Parámetros por defecto de SGBM (partimos de los del tutorial 6 y los ajustamos).
+# Con f≈600px y baseline≈60mm: d = f*B/Z  ->  Z=250mm: d≈145, Z=800mm: d≈45.
+DEFAULT_SGBM = {
+    "minDisparity": 0,
+    "numDisparities": 192,     # múltiplo de 16
+    "blockSize": 5,
+    "uniquenessRatio": 10,
+    "speckleWindowSize": 200,
+    "speckleRange": 2,
+    "disp12MaxDiff": 1,
+    "preFilterCap": 63,
+    "mode": cv2.STEREO_SGBM_MODE_SGBM_3WAY,
+}
+
+
+def compute_disparity(left_rect_gray, right_rect_gray, params=None):
+    """Devuelve la disparidad en píxeles (float32). Valores <= minDisparity son inválidos."""
+    p = dict(DEFAULT_SGBM)
+    if params:
+        p.update(params)
+
+    # P1/P2 según la recomendación de OpenCV: 8*canales*bs^2 y 32*canales*bs^2
+    bs = p["blockSize"]
+    p.setdefault("P1", 8 * bs * bs)
+    p.setdefault("P2", 32 * bs * bs)
+
+    sgbm = cv2.StereoSGBM_create(**p)
+    # SGBM devuelve disparidad en punto fijo (x16)
+    disparity = sgbm.compute(left_rect_gray, right_rect_gray).astype(np.float32) / 16.0
+    return disparity
+
+
+def disparity_to_points(disparity, Q, left_rect_bgr, min_disparity=1.0, z_range=(50, 2000)):
+    """
+    Usa la matriz Q de stereoRectify para pasar de (u, v, d) a (X, Y, Z).
+    La nube queda en el sistema de la cámara IZQUIERDA RECTIFICADA, en mm.
+    Devuelve (points Nx3, colors Nx3 RGB en [0,1]).
+    """
+    points_3d = cv2.reprojectImageTo3D(disparity, Q)
+
+    Z = points_3d[:, :, 2]
+    valid = (disparity > min_disparity) & np.isfinite(Z) & (Z > z_range[0]) & (Z < z_range[1])
+
+    points = points_3d[valid].astype(np.float64)
+    colors = left_rect_bgr[valid][:, ::-1].astype(np.float64) / 255.0  # BGR -> RGB
+    return points, colors
+
+
+def disparity_to_color(disparity, num_disparities=None):
+    """Imagen BGR para visualizar la disparidad."""
+    d = disparity.copy()
+    d[d < 0] = 0
+    vmax = num_disparities or max(d.max(), 1)
+    d8 = np.clip(d / vmax * 255, 0, 255).astype(np.uint8)
+    vis = cv2.applyColorMap(d8, cv2.COLORMAP_TURBO)
+    vis[disparity <= 0] = 0
+    return vis
