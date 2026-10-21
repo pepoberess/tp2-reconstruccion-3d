@@ -69,15 +69,16 @@ def save_per_view_errors_figure(calibration, path):
     errors = calibration["per_view_errors"]
     used = calibration["used_pairs"]
     x = np.arange(len(used))
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(5.5, 2.8))
     ax.bar(x - 0.2, errors[:, 0], 0.4, label="left")
     ax.bar(x + 0.2, errors[:, 1], 0.4, label="right")
     ax.axhline(calibration["rms_stereo"], color="k", linestyle="--",
                label=f"RMS global = {calibration['rms_stereo']:.3f} px")
-    ax.set_xticks(x, [str(u) for u in used])
+    step = max(1, len(used) // 10)  # con muchos pares, una etiqueta cada `step`
+    ax.set_xticks(x[::step], [str(u) for u in used[::step]])
     ax.set_xlabel("par de calibración")
     ax.set_ylabel("error de reproyección [px]")
-    ax.legend()
+    ax.legend(loc="upper right")
     fig.tight_layout()
     fig.savefig(path, dpi=110)
     plt.close(fig)
@@ -137,11 +138,12 @@ def save_pnp_errors_figure(per_view, path):
     """Error de reproyección de solvePnP en cada captura (calidad de cada pose)."""
     idx = [v["idx"] for v in per_view]
     err = np.array([v["pnp_reproj_error_px"] for v in per_view], dtype=float)
-    fig, ax = plt.subplots(figsize=(max(8, len(idx) * 0.22), 4))
+    fig, ax = plt.subplots(figsize=(5.5, 2.8))
     ax.bar(range(len(idx)), err, color="tab:blue")
     ax.axhline(np.nanmean(err), color="k", linestyle="--",
                label=f"media = {np.nanmean(err):.2f} px")
-    ax.set_xticks(range(len(idx)), [str(i) for i in idx], fontsize=7)
+    step = max(1, len(idx) // 10)
+    ax.set_xticks(range(0, len(idx), step), [str(i) for i in idx[::step]])
     ax.set_xlabel("captura")
     ax.set_ylabel("error de reproyección PnP [px]")
     ax.legend()
@@ -227,10 +229,10 @@ def save_stages_figure(clouds, path, max_points=40000):
         ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=cols, s=0.3)
         ax.set_box_aspect(np.ptp(pts, axis=0))
         ax.view_init(elev=25, azim=-60)
-        ax.set_title(f"{k + 1}. {names[key]}\n{n:,} puntos", fontsize=10)
+        ax.set_title(f"{k + 1}. {names[key]}\n{n:,} puntos", fontsize=24)
         ax.set_xticklabels([]); ax.set_yticklabels([]); ax.set_zticklabels([])
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -256,7 +258,7 @@ def save_mesh_figure(mesh, path, max_triangles=60000):
         ax.axis("off")
     fig.suptitle(f"malla Poisson ({len(t):,} triángulos)")
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
 
 
