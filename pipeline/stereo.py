@@ -91,6 +91,55 @@ def disparity_to_points(disparity, Q, left_rect_bgr, min_disparity=1.0, z_range=
     return points, colors
 
 
+def board_disparity_correction(disparity, Q, object_points, image_points, rvec, tvec,
+                               min_points=20, max_scale_change=0.2):
+    """
+    Compara la disparidad medida con la que "debería" tener el tablero según la pose de PnP.
+
+    Para cada esquina del ChArUco conocemos su posición 3D en la cámara (con la pose), así
+    que sabemos su profundidad Z y por lo tanto su disparidad esperada (d = f·B / Z, usando Q).
+    Ajustamos  d_medida = a · d_esperada + b  con dos pasadas de mínimos cuadrados (la
+    segunda sin los puntos que quedan muy lejos de la recta).
+
+    Si la cámara mira el tablero casi de frente, todas las esquinas tienen disparidades
+    parecidas y la recta queda mal definida (escala y corrimiento se confunden). En ese caso
+    (escala que cambia más de `max_scale_change`) corregimos solo el corrimiento: a = 1.
+
+    Devuelve (a, b, puntos usados), o None si no hay suficientes esquinas.
+    """
+    R, _ = cv2.Rodrigues(rvec)
+    corners_cam = object_points @ R.T + tvec.reshape(3)
+    expected = (Q[2, 3] / corners_cam[:, 2] - Q[3, 3]) / Q[3, 2]
+
+    u = image_points[:, 0].reshape(-1, 1).astype(np.float32)
+    v = image_points[:, 1].reshape(-1, 1).astype(np.float32)
+    measured = cv2.remap(disparity.astype(np.float32), u, v, cv2.INTER_LINEAR).ravel()
+
+    valid = measured > 1
+    for scale_free in (True, False):
+        use = valid.copy()
+        for _ in range(2):
+            if use.sum() < min_points:
+                return None
+            if scale_free:
+                a, b = np.polyfit(expected[use], measured[use], 1)
+            else:
+                a, b = 1.0, np.median(measured[use] - expected[use])
+            residual = measured - (a * expected + b)
+            spread = 1.4826 * np.median(np.abs(residual[use])) + 1e-6
+            use &= np.abs(residual) < 3 * spread
+        if use.sum() >= min_points and abs(a - 1) <= max_scale_change:
+            return float(a), float(b), int(use.sum())
+    return None
+
+
+def apply_disparity_correction(disparity, a, b):
+    """Corrige la disparidad con el ajuste de `board_disparity_correction`. Lo inválido sigue inválido."""
+    corrected = (disparity - b) / a
+    corrected[disparity <= 0] = 0
+    return corrected.astype(np.float32)
+
+
 def disparity_to_color(disparity, num_disparities=None):
     """Imagen BGR para visualizar la disparidad."""
     d = disparity.copy()

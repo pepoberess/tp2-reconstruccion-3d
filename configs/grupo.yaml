@@ -16,6 +16,10 @@ maps_pkl: null
 # false: exactamente como el tutorial 6 (stereoCalibrate desde cero, flags=0).
 mono_init: false
 
+# Pares de calibración con error de reproyección mayor a esto (en px) se descartan y se
+# vuelve a calibrar sin ellos. null para usar todos.
+max_view_error_px: 2.0
+
 rectify_alpha: 0         # 0: recorta zonas negras; 1: conserva todos los píxeles
 
 # Método de disparidad:
@@ -34,6 +38,12 @@ sgbm:                     # ver pipeline/stereo.py (DEFAULT_SGBM)
   uniquenessRatio: 10
   speckleWindowSize: 200
   speckleRange: 2
+
+# Corrige la disparidad de cada vista usando el ChArUco: compara la disparidad medida en
+# las esquinas del tablero con la que corresponde a la profundidad que da PnP, y ajusta
+# d_medida = a·d_esperada + b. Hace falta en este dataset porque cada vista tiene un error
+# de profundidad distinto (la cámara se movía al sacar las fotos).
+board_disparity_correction: true
 
 # rango de profundidad (mm, cámara) aceptado para la nube local
 z_range: [100, 1000]

@@ -11,6 +11,7 @@ Salidas en <output>/:
     intermediate/                              pesados, NO se entregan
 """
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -64,7 +65,7 @@ def save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts,
     plt.close(fig)
 
 
-def save_per_view_errors_figure(calibration, path):
+def save_per_view_errors_figure(calibration, path, threshold=None):
     """Error de reproyección por par (stereoCalibrateExtended, tutorial 6)."""
     errors = calibration["per_view_errors"]
     used = calibration["used_pairs"]
@@ -74,6 +75,9 @@ def save_per_view_errors_figure(calibration, path):
     ax.bar(x + 0.2, errors[:, 1], 0.4, label="right")
     ax.axhline(calibration["rms_stereo"], color="k", linestyle="--",
                label=f"RMS global = {calibration['rms_stereo']:.3f} px")
+    if threshold:
+        ax.axhline(threshold, color="tab:red", linestyle=":",
+                   label=f"umbral para descartar = {threshold} px")
     ax.set_xticks(x, [str(u) for u in used])
     ax.set_xlabel("par de calibración")
     ax.set_ylabel("error de reproyección [px]")
@@ -277,13 +281,33 @@ def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
         world, left_pts, right_pts, size, used = stereo_calib.detect_calibration_corners(
             calib_dir, checkerboard, square
         )
-        calibration = stereo_calib.stereo_calibrate(
-            world, left_pts, right_pts, size, mono_init=cfg.get("mono_init", True)
-        )
+        mono_init = cfg.get("mono_init", True)
+        calibration = stereo_calib.stereo_calibrate(world, left_pts, right_pts, size, mono_init=mono_init)
         calibration["used_pairs"] = used
         save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts,
                                  os.path.join(fig_dir, "00_deteccion_checkerboard.png"))
-        save_per_view_errors_figure(calibration, os.path.join(fig_dir, "00_error_por_vista.png"))
+
+        # Opcional: sacar los pares que calibraron mal (foto movida, tablero muy inclinado)
+        # y volver a calibrar sin ellos.
+        max_error = cfg.get("max_view_error_px")
+        save_per_view_errors_figure(calibration, os.path.join(fig_dir, "00_error_por_vista.png"),
+                                    threshold=max_error)
+        if max_error:
+            keep = calibration["per_view_errors"].max(axis=1) <= max_error
+            dropped = [u for u, k in zip(used, keep) if not k]
+            if dropped:
+                print(f"  se descartan {len(dropped)} pares con error > {max_error} px: {dropped}")
+                world = [w for w, k in zip(world, keep) if k]
+                left_pts = [p for p, k in zip(left_pts, keep) if k]
+                right_pts = [p for p, k in zip(right_pts, keep) if k]
+                used = [u for u, k in zip(used, keep) if k]
+                rms_before = calibration["rms_stereo"]
+                calibration = stereo_calib.stereo_calibrate(world, left_pts, right_pts, size,
+                                                            mono_init=mono_init)
+                calibration["used_pairs"] = used
+                calibration["dropped_pairs"] = dropped
+                calibration["rms_stereo_before_drop"] = rms_before
+                save_per_view_errors_figure(calibration, os.path.join(fig_dir, "00b_error_por_vista_final.png"))
     stereo_calib.print_calibration(calibration)
 
     if cfg.get("maps_pkl"):
@@ -317,7 +341,10 @@ def compute_disparity(cfg, left_r, right_r, idx, inter_dir):
                                         cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY), cfg.get("sgbm"))
 
     cre = cfg.get("crestereo", {})
-    cache = os.path.join(inter_dir, f"disp_crestereo_{idx}.npy")
+    # El nombre del cache depende del par rectificado: si cambia la calibración (y por lo
+    # tanto la rectificación), no se reutiliza una disparidad vieja por error.
+    image_hash = hashlib.md5(left_r.tobytes() + right_r.tobytes()).hexdigest()[:10]
+    cache = os.path.join(inter_dir, f"disp_crestereo_{idx}_{image_hash}.npy")
     if os.path.exists(cache):
         return np.load(cache).astype(np.float32)
     disparity = stereo.compute_disparity_cre(
@@ -349,16 +376,25 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
         # 1. stereo matching
         disparity = compute_disparity(cfg, left_r, right_r, idx, inter_dir)
 
-        # 2. nube local (cámara izquierda rectificada)
-        points, colors = stereo.disparity_to_points(
-            disparity, Q, left_r, z_range=cfg.get("z_range", (50, 2000))
-        )
-
-        # 3. pose global con solvePnP sobre la imagen izquierda rectificada
+        # 2. pose global con solvePnP sobre la imagen izquierda rectificada
         p = pose_mod.estimate_pose(left_r, markers, K_rect, board=board)
         if p is None:
             print(f"  captura {idx}: no se detectó el objeto de referencia, se descarta")
             continue
+
+        # 2b. opcional: corregir la disparidad de esta vista para que el tablero quede
+        #     a la profundidad que da PnP (ver stereo.board_disparity_correction)
+        correction = None
+        if cfg.get("board_disparity_correction") and "object_points" in p:
+            correction = stereo.board_disparity_correction(
+                disparity, Q, p["object_points"], p["image_points"], p["rvec"], p["tvec"])
+            if correction is not None:
+                disparity = stereo.apply_disparity_correction(disparity, *correction[:2])
+
+        # 3. nube local (cámara izquierda rectificada)
+        points, colors = stereo.disparity_to_points(
+            disparity, Q, left_r, z_range=cfg.get("z_range", (50, 2000))
+        )
 
         # 4. local -> mundo
         T_world_cam = FLIP_Z_UP @ pose_mod.pose_to_matrix(p["rvec"], p["tvec"])
@@ -371,10 +407,13 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
             "idx": idx, "points": len(points), "pose_method": p["method"],
             "pnp_points": p["num_points"], "pnp_reproj_error_px": p["reproj_error"],
             "camera_center_mm": T_world_cam[:3, 3].round(1).tolist(),
+            "disparity_scale": correction[0] if correction else None,
+            "disparity_offset_px": correction[1] if correction else None,
         })
+        fix = f" | disp. corregida: x{correction[0]:.3f} {correction[1]:+.1f}px" if correction else ""
         print(f"  captura {idx:>2}: {len(points):>8,} pts | pose {p['method']} "
               f"({p['num_points']} pts, err {p['reproj_error']:.2f}px) | "
-              f"cámara en {T_world_cam[:3, 3].round(0)}")
+              f"cámara en {T_world_cam[:3, 3].round(0)}{fix}")
 
         if n == 0:
             save_rectification_figure(left, right, left_r, right_r,
@@ -403,7 +442,7 @@ def main():
     parser.add_argument("--show", action="store_true", help="abrir visores de Open3D")
     args = parser.parse_args()
 
-    with open(args.config) as f:
+    with open(args.config, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
     dataset_dir = resolve(cfg["dataset"])
@@ -483,6 +522,8 @@ def main():
             "R": calibration["R"].tolist(),
             "T": calibration["T"].ravel().tolist(),
             "used_pairs": calibration.get("used_pairs"),
+            "dropped_pairs": calibration.get("dropped_pairs"),
+            "rms_stereo_before_drop_px": calibration.get("rms_stereo_before_drop"),
         },
         "views": per_view,
         "points_per_stage": stages,

@@ -111,7 +111,9 @@ def estimate_pose(image, markers, K, dist=None, board=None):
     proj, _ = cv2.projectPoints(obj, rvec, tvec, K, dist)
     err = float(np.sqrt(np.mean(np.sum((proj.reshape(-1, 2) - img) ** 2, axis=1))))
     return {"rvec": rvec, "tvec": tvec, "reproj_error": err,
-            "num_points": len(obj), "method": "pnp"}
+            "num_points": len(obj), "method": "pnp",
+            # correspondencias usadas (sirven para corregir la disparidad con el tablero)
+            "object_points": obj, "image_points": img}
 
 
 def pose_to_matrix(rvec, tvec):
