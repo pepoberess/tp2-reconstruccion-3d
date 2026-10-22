@@ -1,6 +1,3 @@
-"""
-Paso 4.2 (1 y 2): disparidad sobre el par rectificado y nube de puntos local.
-"""
 import contextlib
 import io
 import os
@@ -10,7 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-# Parámetros por defecto de SGBM (partimos de los del tutorial 6 y los ajustamos).
+# Parámetros por defecto de SGBM.
 # Con f≈600px y baseline≈60mm: d = f*B/Z  ->  Z=250mm: d≈145, Z=800mm: d≈45.
 DEFAULT_SGBM = {
     "minDisparity": 0,
@@ -51,9 +48,8 @@ CATEDRA_DISPARITY_DIR = os.path.join(
 
 def compute_disparity_cre(left_rect_bgr, right_rect_bgr, models_dir, shape="1280x720", iterations="10"):
     """
-    Disparidad con CREStereo (red neuronal, CVPR 2022) usando el módulo `disparity`
-    de la cátedra (tutorial 6 / code_examples). La red trabaja a `shape` y el
-    módulo reescala la disparidad a la resolución original.
+    Disparidad con CREStereo (red neuronal, CVPR 2022) usando el módulo `disparity`. 
+    La red trabaja a `shape` y el módulo reescala la disparidad a la resolución original.
     El modelo .onnx tiene que estar en `models_dir` (ver README).
     """
     global _CRE_METHOD

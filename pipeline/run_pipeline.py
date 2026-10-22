@@ -1,27 +1,15 @@
 """
-TP2 - Reconstrucción 3D. Corre el pipeline completo sobre un dataset:
-
-    python pipeline/run_pipeline.py configs/stereo_budha_charuco.yaml [--show]
-
-Salidas en <output>/:
-    stereo_calibration.pkl, stereo_maps.pkl   calibración + mapas de rectificación
-    figures/                                   imágenes para el informe
-    reconstruction.ply                         nube final optimizada (entregable)
-    summary.json                               parámetros, puntos por etapa, medición
-    intermediate/                              pesados, NO se entregan
+Pasos del pipeline que usa el notebook (calibración y reconstrucción de cada captura)
+y las funciones que dibujan las figuras de output/<dataset>/figures/.
 """
-import argparse
 import hashlib
-import json
 import os
 import sys
 
 import cv2
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
-import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -48,7 +36,7 @@ def resolve(path):
 # ---------------------------------------------------------------------------
 
 def save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts, path):
-    """Detección de corners en un par de calibración (calib.draw_checkerboard, tutorial 6)."""
+    """Detección de corners en un par de calibración."""
     i = len(used) // 2
     pairs = {idx: (lf, rf) for idx, lf, rf in list_stereo_pairs(calib_dir)}
     lf, rf = pairs[used[i]]
@@ -66,11 +54,11 @@ def save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts,
 
 
 def save_per_view_errors_figure(calibration, path, threshold=None):
-    """Error de reproyección por par (stereoCalibrateExtended, tutorial 6)."""
+    """Error de reproyección por par."""
     errors = calibration["per_view_errors"]
     used = calibration["used_pairs"]
     x = np.arange(len(used))
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(7, 3.2))
     ax.bar(x - 0.2, errors[:, 0], 0.4, label="left")
     ax.bar(x + 0.2, errors[:, 1], 0.4, label="right")
     ax.axhline(calibration["rms_stereo"], color="k", linestyle="--",
@@ -78,12 +66,15 @@ def save_per_view_errors_figure(calibration, path, threshold=None):
     if threshold:
         ax.axhline(threshold, color="tab:red", linestyle=":",
                    label=f"umbral para descartar = {threshold} px")
-    ax.set_xticks(x, [str(u) for u in used])
+    step = max(1, len(used) // 10)  # con muchos pares, una etiqueta cada `step`
+    ax.set_xticks(x[::step], [str(u) for u in used[::step]])
+    ax.set_xlim(-1, len(used))
     ax.set_xlabel("par de calibración")
     ax.set_ylabel("error de reproyección [px]")
-    ax.legend()
+    # leyenda arriba, afuera del gráfico, para que no tape las barras altas
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=8)
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -141,16 +132,18 @@ def save_pnp_errors_figure(per_view, path):
     """Error de reproyección de solvePnP en cada captura (calidad de cada pose)."""
     idx = [v["idx"] for v in per_view]
     err = np.array([v["pnp_reproj_error_px"] for v in per_view], dtype=float)
-    fig, ax = plt.subplots(figsize=(max(8, len(idx) * 0.22), 4))
+    fig, ax = plt.subplots(figsize=(7, 3.2))
     ax.bar(range(len(idx)), err, color="tab:blue")
     ax.axhline(np.nanmean(err), color="k", linestyle="--",
                label=f"media = {np.nanmean(err):.2f} px")
-    ax.set_xticks(range(len(idx)), [str(i) for i in idx], fontsize=7)
+    step = max(1, len(idx) // 10)
+    ax.set_xticks(range(0, len(idx), step), [str(i) for i in idx[::step]])
+    ax.set_xlim(-1, len(idx))
     ax.set_xlabel("captura")
     ax.set_ylabel("error de reproyección PnP [px]")
-    ax.legend()
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False, fontsize=8)
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -179,18 +172,20 @@ def save_poses_figure(pcd, poses_world, path, K, image_size, max_points=40000):
     ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=cols, s=0.5)
     centers = np.array([T[:3, 3] for T in poses_world])
     ax.plot(centers[:, 0], centers[:, 1], centers[:, 2], "b.-", label="cámaras")
+    label_step = max(1, len(poses_world) // 12)  # numeramos solo algunas para que no se pisen
     for i, T in enumerate(poses_world):
-        for a, b in frustum_lines(T, K, image_size, depth=25):
-            ax.plot(*np.c_[a, b], color="r", linewidth=0.6)
-        ax.text(*T[:3, 3], str(i), fontsize=7)
+        for a, b in frustum_lines(T, K, image_size, depth=15):
+            ax.plot(*np.c_[a, b], color="r", linewidth=0.5)
+        if i % label_step == 0:
+            ax.text(*(T[:3, 3] + [0, 0, 12]), str(i), fontsize=8, ha="center")
     # ejes del mundo
     for v, color in zip(np.eye(3) * 100, "rgb"):
         ax.quiver(0, 0, 0, *v, color=color, linewidth=2)
     ax.set_xlabel("X [mm]"); ax.set_ylabel("Y [mm]"); ax.set_zlabel("Z [mm]")
     ax.set_box_aspect(np.ptp(np.vstack([pts, centers]), axis=0))
-    ax.legend()
+    ax.legend(loc="upper left")
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -231,10 +226,10 @@ def save_stages_figure(clouds, path, max_points=40000):
         ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=cols, s=0.3)
         ax.set_box_aspect(np.ptp(pts, axis=0))
         ax.view_init(elev=25, azim=-60)
-        ax.set_title(f"{k + 1}. {names[key]}\n{n:,} puntos", fontsize=10)
+        ax.set_title(f"{k + 1}. {names[key]}\n{n:,} puntos", fontsize=20)
         ax.set_xticklabels([]); ax.set_yticklabels([]); ax.set_zticklabels([])
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -260,7 +255,7 @@ def save_mesh_figure(mesh, path, max_triangles=60000):
         ax.axis("off")
     fig.suptitle(f"malla Poisson ({len(t):,} triángulos)")
     fig.tight_layout()
-    fig.savefig(path, dpi=110)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -433,113 +428,3 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
 
     pcd = fusion.make_pcd(np.vstack(all_points), np.vstack(all_colors))
     return pcd, poses_world, per_view, K_rect
-
-
-def main():
-    matplotlib.use("Agg")  # solo figuras a archivo (el notebook importa este módulo y muestra inline)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("config")
-    parser.add_argument("--show", action="store_true", help="abrir visores de Open3D")
-    args = parser.parse_args()
-
-    with open(args.config, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-
-    dataset_dir = resolve(cfg["dataset"])
-    out_dir = resolve(cfg["output"])
-    fig_dir = os.path.join(out_dir, "figures")
-    inter_dir = os.path.join(out_dir, "intermediate")
-    for d in (out_dir, fig_dir, inter_dir):
-        os.makedirs(d, exist_ok=True)
-
-    calibration, maps = step_calibration(cfg, dataset_dir, out_dir, fig_dir)
-    pcd, poses_world, per_view, K_rect = step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir)
-
-    print("\n[4.3] Fusión y optimización")
-    scene_preview = pcd.voxel_down_sample(3.0)
-    o3d.io.write_point_cloud(os.path.join(inter_dir, "scene_preview.ply"), scene_preview)
-    # escena alrededor de la caja del objeto (+20 cm) para ver cámaras y tablero
-    margin = np.array([200, 200, 50])
-    scene_crop = scene_preview.crop(o3d.geometry.AxisAlignedBoundingBox(
-        np.array(cfg["box_min"]) - margin, np.array(cfg["box_max"]) + margin))
-    save_poses_figure(scene_crop, poses_world, os.path.join(fig_dir, "05_poses_camaras.png"),
-                      K_rect, calibration["image_size"])
-    save_pnp_errors_figure(per_view, os.path.join(fig_dir, "04b_error_pnp_por_captura.png"))
-
-    out = cfg["outliers"]
-    stage_clouds = {}
-    final, obb, plane, stages = fusion.optimize(
-        pcd, cfg["box_min"], cfg["box_max"], cfg["voxel_size"],
-        out["nb_neighbors"], out["std_ratio"], plane_margin=cfg.get("plane_margin"),
-        clouds=stage_clouds,
-    )
-    if cfg.get("largest_cluster_eps"):
-        final = fusion.keep_largest_cluster(final, cfg["largest_cluster_eps"])
-        stages["largest_cluster"] = len(final.points)
-        stage_clouds["largest_cluster"] = final
-        print(f"  {'cluster':>13}: {stages['largest_cluster']:>10,} puntos")
-    save_stages_figure(stage_clouds, os.path.join(fig_dir, "06a_etapas_optimizacion.png"))
-
-    save_cloud_views(final, os.path.join(fig_dir, "06_nube_final.png"), "nube final optimizada")
-
-    ply_path = os.path.join(out_dir, "reconstruction.ply")
-    o3d.io.write_point_cloud(ply_path, final, write_ascii=False)
-    print(f"  guardado {ply_path} ({os.path.getsize(ply_path) / 1e6:.1f} MB)")
-
-    if cfg.get("poisson"):
-        print("\n[opcional] Malla con Poisson")
-        pc = cfg["poisson"]
-        mesh = fusion.poisson_mesh(final, depth=pc.get("depth", 8),
-                                   normal_radius=pc.get("normal_radius", 5.0),
-                                   density_quantile=pc.get("density_quantile", 0.05),
-                                   target_triangles=pc.get("target_triangles", 200_000))
-        mesh_path = os.path.join(out_dir, "reconstruction_mesh.ply")
-        o3d.io.write_triangle_mesh(mesh_path, mesh)
-        print(f"  {len(mesh.triangles):,} triángulos -> {mesh_path} "
-              f"({os.path.getsize(mesh_path) / 1e6:.1f} MB)")
-        save_mesh_figure(mesh, os.path.join(fig_dir, "07_malla_poisson.png"))
-
-    print("\n[5] Medición métrica")
-    m = fusion.measure(final, plane)
-    print(f"  alto (sobre el plano de apoyo): {m['height_mm']:.1f} mm (máx {m['height_max_mm']:.1f})")
-    print(f"  ancho X: {m['width_x_mm']:.1f} mm | profundidad Y: {m['depth_y_mm']:.1f} mm")
-    print(f"  OBB mínima (lados): {np.round(m['obb_extent_mm'], 1)} mm")
-    if cfg.get("real_height_mm"):
-        rel = abs(m["height_mm"] - cfg["real_height_mm"]) / cfg["real_height_mm"]
-        m["height_rel_error"] = rel
-        print(f"  error relativo vs real ({cfg['real_height_mm']} mm): {rel:.1%}")
-
-    summary = {
-        "calibration": {
-            "rms_stereo_px": calibration.get("rms_stereo"),
-            "rms_left_px": calibration.get("rms_left"),
-            "rms_right_px": calibration.get("rms_right"),
-            "baseline_mm": float(np.linalg.norm(calibration["T"])),
-            "left_K": calibration["left_K"].tolist(),
-            "right_K": calibration["right_K"].tolist(),
-            "left_dist": calibration["left_dist"].ravel().tolist(),
-            "right_dist": calibration["right_dist"].ravel().tolist(),
-            "R": calibration["R"].tolist(),
-            "T": calibration["T"].ravel().tolist(),
-            "used_pairs": calibration.get("used_pairs"),
-            "dropped_pairs": calibration.get("dropped_pairs"),
-            "rms_stereo_before_drop_px": calibration.get("rms_stereo_before_drop"),
-        },
-        "views": per_view,
-        "points_per_stage": stages,
-        "measurement": m,
-        "config": cfg,
-    }
-    with open(os.path.join(out_dir, "summary.json"), "w") as f:
-        json.dump(summary, f, indent=2, default=float)
-
-    if args.show:
-        world_axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=100)
-        cams = fusion.camera_geometries(poses_world, K_rect, calibration["image_size"])
-        o3d.visualization.draw_geometries([scene_preview, world_axes, obb] + cams,
-                                          window_name="escena + cámaras + caja")
-        o3d.visualization.draw_geometries([final, world_axes], window_name="nube final")
-
-
-if __name__ == "__main__":
-    main()

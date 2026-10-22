@@ -34,19 +34,11 @@ curl -L -o models/crestereo_combined_iter10_720x1280.onnx \
 
 ## Uso
 
-Desde la raíz del repo:
-
-```bash
-python pipeline/run_pipeline.py configs/grupo.yaml                  # nuestro dataset (CREStereo, ~15 min la primera vez)
-python pipeline/run_pipeline.py configs/stereo_budha_charuco.yaml   # dataset del Buda
-python pipeline/run_pipeline.py configs/grupo.yaml --show           # además abre los visores de Open3D
-```
-
-### Notebook
-
-`tp2_reconstruccion.ipynb` hace lo mismo pero paso a paso, mostrando las figuras de cada
-etapa y comentando los resultados. Usa las funciones de `pipeline/`, no repite código.
-Hay que abrirlo con el entorno donde se instalaron las dependencias.
+Todo se corre desde `tp2_reconstruccion.ipynb`: recorre el pipeline paso a paso, mostrando
+las figuras de cada etapa y comentando los resultados. Usa las funciones de `pipeline/`.
+Hay que abrirlo con el entorno donde se instalaron las dependencias. El dataset se elige con
+`CONFIG_PATH` (`configs/grupo.yaml` es el nuestro, ~15 min la primera vez con CREStereo;
+`configs/stereo_budha_charuco.yaml` es el del Buda).
 
 En Google Colab: clonar el repo, instalar `requirements.txt` y abrir el notebook. Ahí usa
 SGBM por defecto porque CREStereo en CPU es lento (se puede forzar con `USE_CRESTEREO = True`).
@@ -60,7 +52,6 @@ Todo se guarda en `output/<dataset>/`:
 - `stereo_calibration.pkl` y `stereo_maps.pkl`: calibración y mapas de rectificación, con
   el mismo formato que `calib-stereo`.
 - `figures/`: las figuras para el informe.
-- `summary.json`: parámetros de calibración, errores, poses, puntos por etapa y medición.
 - `intermediate/`: disparidades guardadas y nubes intermedias (no se entregan).
 
 ## Estructura
@@ -74,7 +65,7 @@ pipeline/
   fusion.py         caja, voxel, plano del tablero, outliers, DBSCAN, Poisson y medición
   aruco.py          módulo de la cátedra (tutorial 7)
   calib.py          módulo de la cátedra (tutorial 6)
-  run_pipeline.py   corre todo el pipeline
+  run_pipeline.py   pasos de calibración y reconstrucción + figuras (los usa el notebook)
 configs/
   grupo.yaml                 nuestro dataset (peluche)
   stereo_budha_charuco.yaml  dataset del Buda
@@ -105,8 +96,9 @@ configs/
 - **Limpieza de la nube**: caja alrededor del objeto, voxel de 1 mm, se saca el plano del
   tablero con RANSAC (todo lo que está a menos de 15 mm), outliers estadísticos y nos quedamos
   con el cluster más grande (DBSCAN).
-- **Malla (opcional)**: normales, Poisson con profundidad 8, se sacan los vértices con poca
-  densidad y se simplifica a 200k triángulos.
+- **Malla (opcional)**: normales (vecindad de 10 mm), Poisson con profundidad 8, se saca el
+  25% de vértices con menos densidad y los pedazos sueltos de malla, y se simplifica a 200k
+  triángulos.
 - **Medición**: alto = distancia al plano del tablero (percentil 99.5); ancho y profundidad
   = extensión en X e Y (percentiles 0.5 a 99.5).
 

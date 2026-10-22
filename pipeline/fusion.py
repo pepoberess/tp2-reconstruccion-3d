@@ -1,6 +1,3 @@
-"""
-Paso 4.3 (fusión y optimización) y paso 5 (medición métrica) con Open3D.
-"""
 import numpy as np
 import open3d as o3d
 
@@ -86,7 +83,7 @@ def optimize(pcd, box_min, box_max, voxel_size, nb_neighbors, std_ratio,
 
 
 def keep_largest_cluster(pcd, eps, min_points=20):
-    """Opcional: se queda con el cluster más grande (DBSCAN), útil para sacar restos del tablero."""
+    """Se queda con el cluster más grande (DBSCAN)."""
     labels = np.array(pcd.cluster_dbscan(eps=eps, min_points=min_points))
     if labels.max() < 0:
         return pcd
@@ -94,13 +91,16 @@ def keep_largest_cluster(pcd, eps, min_points=20):
     return pcd.select_by_index(np.where(labels == largest)[0])
 
 
-def poisson_mesh(pcd, depth=8, normal_radius=5.0, density_quantile=0.05, target_triangles=200_000):
+def poisson_mesh(pcd, depth=8, normal_radius=5.0, density_quantile=0.05, target_triangles=200_000,
+                 min_component_ratio=0.02):
     """
-    Opcional del enunciado: malla por reconstrucción de Poisson.
+    Malla por reconstrucción de Poisson.
     1. normales por vecindad, orientadas consistentemente
     2. Poisson (profundidad del octree `depth`: más alto = más detalle)
     3. se sacan los triángulos de baja densidad (Poisson "inventa" superficie
        donde no hay puntos, sobre todo en los bordes abiertos)
+    4. se sacan los pedazos sueltos de malla con menos de `min_component_ratio`
+       de los triángulos del pedazo más grande (flecos que salen del ruido)
     """
     pcd = o3d.geometry.PointCloud(pcd)
     pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=normal_radius, max_nn=30))
@@ -113,6 +113,12 @@ def poisson_mesh(pcd, depth=8, normal_radius=5.0, density_quantile=0.05, target_
 
     # recorta a la caja de la nube (Poisson cierra la superficie más allá de los datos)
     mesh = mesh.crop(pcd.get_axis_aligned_bounding_box())
+
+    if min_component_ratio:
+        ids, counts, _ = mesh.cluster_connected_triangles()
+        ids, counts = np.asarray(ids), np.asarray(counts)
+        mesh.remove_triangles_by_mask(counts[ids] < min_component_ratio * counts.max())
+        mesh.remove_unreferenced_vertices()
     # simplificación (quadric decimation) para que el archivo sea manejable
     if len(mesh.triangles) > target_triangles:
         mesh = mesh.simplify_quadric_decimation(target_triangles)
@@ -149,19 +155,3 @@ def measure(pcd, plane=None, low=0.5, high=99.5):
         "aabb_dims_mm": aabb_dims.tolist(),
         "obb_extent_mm": sorted(np.asarray(obb.extent).tolist(), reverse=True),
     }
-
-
-def camera_geometries(poses_world, K, image_size, scale=40.0):
-    """Frustums + ejes de cada cámara, para visualizar en Open3D."""
-    w, h = image_size
-    geoms = []
-    for T in poses_world:
-        extrinsic = np.linalg.inv(T)  # mundo -> cámara
-        frustum = o3d.geometry.LineSet.create_camera_visualization(
-            w, h, K, extrinsic, scale=scale
-        )
-        frustum.paint_uniform_color([0.1, 0.3, 1.0])
-        axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=scale * 0.6)
-        axes.transform(T)
-        geoms += [frustum, axes]
-    return geoms

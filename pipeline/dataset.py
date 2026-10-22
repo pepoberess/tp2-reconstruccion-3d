@@ -1,10 +1,3 @@
-"""
-Lectura de datasets estéreo con la estructura de la cátedra:
-
-    <dataset>/
-        calib/      pares *left*_N.jpg / *right*_N.jpg + checkerboard.txt
-        captures/   pares *left*_N.jpg / *right*_N.jpg + markers.yaml
-"""
 import ast
 import glob
 import os
@@ -14,7 +7,7 @@ import yaml
 
 
 def numeric_sort(file_name):
-    # mismo criterio que en el tutorial 6: ordena por el número final del nombre
+    # ordena por el número final del nombre
     return int(file_name.split("_")[-1].split(".")[0])
 
 

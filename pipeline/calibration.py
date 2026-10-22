@@ -1,11 +1,3 @@
-"""
-Paso 4.1: calibración estéreo + rectificación (tutoriales 5 y 6).
-
-Genera dos pickles con el mismo formato que la herramienta calib-stereo de la cátedra:
-  - stereo_calibration.pkl: left_K, left_dist, right_K, right_dist, R, T, E, F, image_size
-  - stereo_maps.pkl:        left_map_x/y, right_map_x/y, R1, R2, P1, P2, Q, validRoi1/2
-Así, si calibran con la herramienta, pueden saltear este paso y usar sus .pkl.
-"""
 import pickle
 
 import cv2
@@ -20,7 +12,7 @@ def detect_calibration_corners(calib_dir, checkerboard, square_size_mm):
     Busca el checkerboard en cada par (findChessboardCorners + cornerSubPix, vía
     calib.detect_board) y descarta los pares donde no aparece en ambas imágenes.
     """
-    # puntos 3D del tablero (Z=0) en mm, como en el tutorial 6
+    # puntos 3D del tablero (Z=0) en mm
     world = calib.board_points(checkerboard) * square_size_mm
 
     image_size = None
@@ -52,9 +44,8 @@ def detect_calibration_corners(calib_dir, checkerboard, square_size_mm):
 
 def stereo_calibrate(world_points, left_points, right_points, image_size, mono_init=True):
     """
-    mono_init=True: calibra primero cada cámara por separado con calibrateCamera
-    (tutorial 5) y usa eso como inicialización de stereoCalibrate.
-    mono_init=False: igual que el tutorial 6 (stereoCalibrate desde cero, flags=0).
+    mono_init=True: calibra primero cada cámara por separado con calibrateCamera 
+    y usa eso como inicialización de stereoCalibrate. mono_init=False: (stereoCalibrate desde cero, flags=0).
     """
     if mono_init:
         rms_l, K1, D1, _, _ = cv2.calibrateCamera(world_points, left_points, image_size, None, None)
@@ -88,7 +79,7 @@ def stereo_calibrate(world_points, left_points, right_points, image_size, mono_i
 
 
 def stereo_rectify(calibration, alpha=0):
-    """stereoRectify + initUndistortRectifyMap (tutorial 6)."""
+    """stereoRectify + initUndistortRectifyMap."""
     K1, D1 = calibration["left_K"], calibration["left_dist"]
     K2, D2 = calibration["right_K"], calibration["right_dist"]
     size = tuple(calibration["image_size"])

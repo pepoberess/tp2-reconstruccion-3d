@@ -1,7 +1,6 @@
-# Configuración del pipeline para un dataset.
-# Para usar sus propias fotos: copien este archivo, cambien `dataset` (y los
-# parámetros de la caja / disparidad si hace falta) y corran:
-#   python pipeline/run_pipeline.py configs/mi_dataset.yaml
+# Configuración del pipeline para un dataset (la lee el notebook, ver CONFIG_PATH).
+# Para usar otras fotos: copien este archivo, cambien `dataset` (y los parámetros
+# de la caja / disparidad si hace falta) y apunten CONFIG_PATH al nuevo archivo.
 
 # carpeta con subcarpetas calib/ y captures/ (relativa a la raíz del repo)
 dataset: tp2_reconstruccion_3d/datasets/stereo_budha_charuco

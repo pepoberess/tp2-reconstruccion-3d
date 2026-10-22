@@ -1,7 +1,4 @@
 """
-Paso 4.2 (3 y 4): pose de la cámara respecto del marco de referencia ("mundo")
-y transformación de la nube local al mundo.
-
 Estimamos la pose sobre la imagen izquierda RECTIFICADA, usando como intrínseca
 K_rect = P1[:, :3] y distorsión nula (remap ya des-distorsionó). Así la pose
 obtenida corresponde exactamente al sistema en el que reprojectImageTo3D
@@ -10,8 +7,8 @@ devuelve los puntos, y no hace falta componer con R1.
 import cv2
 import numpy as np
 
-import aruco  # módulo de la cátedra (tutorial 7)
-import calib  # módulo de la cátedra (tutorial 6)
+import aruco
+import calib
 
 
 # ---------------------------------------------------------------------------
