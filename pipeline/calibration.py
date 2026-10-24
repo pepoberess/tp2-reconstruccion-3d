@@ -3,16 +3,12 @@ import pickle
 import cv2
 import numpy as np
 
-import calib  # módulo de la cátedra (tutorial 6)
+import calib
 from dataset import list_stereo_pairs
 
 
 def detect_calibration_corners(calib_dir, checkerboard, square_size_mm):
-    """
-    Busca el checkerboard en cada par (findChessboardCorners + cornerSubPix, vía
-    calib.detect_board) y descarta los pares donde no aparece en ambas imágenes.
-    """
-    # puntos 3D del tablero (Z=0) en mm
+    """Detecta el checkerboard en cada par de calibración válido."""
     world = calib.board_points(checkerboard) * square_size_mm
 
     image_size = None
@@ -43,10 +39,7 @@ def detect_calibration_corners(calib_dir, checkerboard, square_size_mm):
 
 
 def stereo_calibrate(world_points, left_points, right_points, image_size, mono_init=True):
-    """
-    mono_init=True: calibra primero cada cámara por separado con calibrateCamera 
-    y usa eso como inicialización de stereoCalibrate. mono_init=False: (stereoCalibrate desde cero, flags=0).
-    """
+    """Calcula la calibración estéreo, opcionalmente inicializada por cámara."""
     if mono_init:
         rms_l, K1, D1, _, _ = cv2.calibrateCamera(world_points, left_points, image_size, None, None)
         rms_r, K2, D2, _, _ = cv2.calibrateCamera(world_points, right_points, image_size, None, None)
@@ -57,7 +50,6 @@ def stereo_calibrate(world_points, left_points, right_points, image_size, mono_i
         K1 = D1 = K2 = D2 = None
         flags = 0
 
-    # stereoCalibrateExtended (tutorial 6) además devuelve el error por vista
     rms, K1, D1, K2, D2, R, T, E, F, _, _, per_view = cv2.stereoCalibrateExtended(
         world_points, left_points, right_points,
         K1, D1, K2, D2, image_size, None, None,
@@ -71,7 +63,6 @@ def stereo_calibrate(world_points, left_points, right_points, image_size, mono_i
         "right_K": K2, "right_dist": D2,
         "R": R, "T": T, "E": E, "F": F,
         "image_size": image_size,
-        # extras para el informe
         "rms_stereo": rms, "rms_left": rms_l, "rms_right": rms_r,
         "per_view_errors": per_view,
     }
@@ -99,23 +90,26 @@ def stereo_rectify(calibration, alpha=0):
 
 
 def rectify_pair(left, right, maps):
+    """Rectifica un par de imágenes con los mapas precalculados."""
     left_r = cv2.remap(left, maps["left_map_x"], maps["left_map_y"], cv2.INTER_LINEAR)
     right_r = cv2.remap(right, maps["right_map_x"], maps["right_map_y"], cv2.INTER_LINEAR)
     return left_r, right_r
 
 
 def save_pickle(obj, path):
+    """Guarda un objeto serializado en la ruta indicada."""
     with open(path, "wb") as f:
         pickle.dump(obj, f)
 
 
 def load_pickle(path):
+    """Carga un objeto serializado desde la ruta indicada."""
     with open(path, "rb") as f:
         return pickle.load(f)
 
 
 def print_calibration(calibration):
-    # mismo formato de impresión que el tutorial 6 (calib.np_print)
+    """Imprime los parámetros principales de una calibración."""
     for name in ["left_K", "left_dist", "right_K", "right_dist", "R", "T"]:
         print(f"  {name} = {calib.np_print(np.atleast_2d(calibration[name]))}")
     print(f"  baseline = {np.linalg.norm(calibration['T']):.2f} mm")

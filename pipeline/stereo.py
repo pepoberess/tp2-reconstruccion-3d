@@ -7,11 +7,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-# Parámetros por defecto de SGBM.
-# Con f≈600px y baseline≈60mm: d = f*B/Z  ->  Z=250mm: d≈145, Z=800mm: d≈45.
 DEFAULT_SGBM = {
     "minDisparity": 0,
-    "numDisparities": 192,     # múltiplo de 16
+    "numDisparities": 192,
     "blockSize": 5,
     "uniquenessRatio": 10,
     "speckleWindowSize": 200,
@@ -28,13 +26,11 @@ def compute_disparity(left_rect_gray, right_rect_gray, params=None):
     if params:
         p.update(params)
 
-    # P1/P2 según la recomendación de OpenCV: 8*canales*bs^2 y 32*canales*bs^2
     bs = p["blockSize"]
     p.setdefault("P1", 8 * bs * bs)
     p.setdefault("P2", 32 * bs * bs)
 
     sgbm = cv2.StereoSGBM_create(**p)
-    # SGBM devuelve disparidad en punto fijo (x16)
     disparity = sgbm.compute(left_rect_gray, right_rect_gray).astype(np.float32) / 16.0
     return disparity
 
@@ -47,11 +43,7 @@ CATEDRA_DISPARITY_DIR = os.path.join(
 
 
 def compute_disparity_cre(left_rect_bgr, right_rect_bgr, models_dir, shape="1280x720", iterations="10"):
-    """
-    Disparidad con CREStereo (red neuronal, CVPR 2022) usando el módulo `disparity`. 
-    La red trabaja a `shape` y el módulo reescala la disparidad a la resolución original.
-    El modelo .onnx tiene que estar en `models_dir` (ver README).
-    """
+    """Calcula la disparidad con el modelo CREStereo."""
     global _CRE_METHOD
     if _CRE_METHOD is None:
         if CATEDRA_DISPARITY_DIR not in sys.path:
@@ -65,44 +57,26 @@ def compute_disparity_cre(left_rect_bgr, right_rect_bgr, models_dir, shape="1280
 
     from disparity.methods import InputPair
 
-    # la calibración del InputPair no se usa para calcular la disparidad
     with contextlib.redirect_stdout(io.StringIO()):
         out = _CRE_METHOD.compute_disparity(InputPair(left_rect_bgr, right_rect_bgr, None, None))
     return out.disparity_pixels.astype(np.float32)
 
 
 def disparity_to_points(disparity, Q, left_rect_bgr, min_disparity=1.0, z_range=(50, 2000)):
-    """
-    Usa la matriz Q de stereoRectify para pasar de (u, v, d) a (X, Y, Z).
-    La nube queda en el sistema de la cámara IZQUIERDA RECTIFICADA, en mm.
-    Devuelve (points Nx3, colors Nx3 RGB en [0,1]).
-    """
+    """Convierte una disparidad en puntos 3D coloreados."""
     points_3d = cv2.reprojectImageTo3D(disparity, Q)
 
     Z = points_3d[:, :, 2]
     valid = (disparity > min_disparity) & np.isfinite(Z) & (Z > z_range[0]) & (Z < z_range[1])
 
     points = points_3d[valid].astype(np.float64)
-    colors = left_rect_bgr[valid][:, ::-1].astype(np.float64) / 255.0  # BGR -> RGB
+    colors = left_rect_bgr[valid][:, ::-1].astype(np.float64) / 255.0
     return points, colors
 
 
 def board_disparity_correction(disparity, Q, object_points, image_points, rvec, tvec,
                                min_points=20, max_scale_change=0.2):
-    """
-    Compara la disparidad medida con la que "debería" tener el tablero según la pose de PnP.
-
-    Para cada esquina del ChArUco conocemos su posición 3D en la cámara (con la pose), así
-    que sabemos su profundidad Z y por lo tanto su disparidad esperada (d = f·B / Z, usando Q).
-    Ajustamos  d_medida = a · d_esperada + b  con dos pasadas de mínimos cuadrados (la
-    segunda sin los puntos que quedan muy lejos de la recta).
-
-    Si la cámara mira el tablero casi de frente, todas las esquinas tienen disparidades
-    parecidas y la recta queda mal definida (escala y corrimiento se confunden). En ese caso
-    (escala que cambia más de `max_scale_change`) corregimos solo el corrimiento: a = 1.
-
-    Devuelve (a, b, puntos usados), o None si no hay suficientes esquinas.
-    """
+    """Estima una corrección de disparidad a partir del tablero."""
     R, _ = cv2.Rodrigues(rvec)
     corners_cam = object_points @ R.T + tvec.reshape(3)
     expected = (Q[2, 3] / corners_cam[:, 2] - Q[3, 3]) / Q[3, 2]

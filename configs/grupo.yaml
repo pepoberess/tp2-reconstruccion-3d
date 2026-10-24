@@ -64,6 +64,20 @@ outliers:
   std_ratio: 1.5
 largest_cluster_eps: 5.0  # mm; null para no usar DBSCAN
 
+# La sección 8 del notebook activa ICP y compara ambas variantes en output/grupo/icp/.
+icp:
+  enabled: false
+  voxel_size: 3.0          # mm, sólo para registrar
+  min_height_mm: 25.0     # excluye el tablero en el marco ChArUco
+  normal_radius_mm: 10.0
+  max_distance_mm: 5.0
+  max_iteration: 50
+  min_points: 100
+  min_fitness: 0.3
+  max_fitness_drop: 0.02
+  max_shift_mm: 10.0       # desplazamiento del centro del objeto
+  max_rotation_deg: 3.0
+
 # Opcional: malla con Poisson (null para no generarla)
 poisson:
   depth: 8                # profundidad del octree (más alto = más detalle)
@@ -72,5 +86,6 @@ poisson:
   min_component_ratio: 0.02  # descarta pedazos sueltos de malla (< 2% del más grande)
   target_triangles: 200000  # simplificación final
 
-# tamaño real del objeto (si lo midieron con regla), para el error relativo
-real_height_mm: null
+# Altura real del peluche sentado, desde la cabeza hasta el plano de apoyo.
+# No incluye la cola colgando: esa postura no coincide con la reconstrucción.
+real_height_mm: 140.0

@@ -7,7 +7,7 @@ import yaml
 
 
 def numeric_sort(file_name):
-    # ordena por el número final del nombre
+    """Obtiene el índice numérico final de un nombre de archivo."""
     return int(file_name.split("_")[-1].split(".")[0])
 
 
@@ -44,11 +44,7 @@ def read_checkerboard_txt(path):
 
 
 def read_markers_yaml(path):
-    """
-    Lee markers.yaml. Devuelve un dict normalizado:
-      charuco:      {type, dictionary, squares_x, squares_y, square_length, marker_length}
-      checkerboard: {type, pattern_size, square_size}
-    """
+    """Lee y normaliza la configuración del patrón de referencia."""
     with open(path) as f:
         raw = yaml.safe_load(f)
 
@@ -63,7 +59,6 @@ def read_markers_yaml(path):
             "marker_length": float(raw["MARKER_LENGTH"]),
         }
     if marker_type == "checkerboard":
-        # PATTERN_SIZE viene como string "(10, 7)"
         pattern = raw["PATTERN_SIZE"]
         if isinstance(pattern, str):
             pattern = tuple(int(n) for n in re.findall(r"\d+", pattern))

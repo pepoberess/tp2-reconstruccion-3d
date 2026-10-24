@@ -63,6 +63,7 @@ pipeline/
   stereo.py         disparidad (SGBM o CREStereo) y nube local con reprojectImageTo3D
   pose.py           detección del ChArUco / checkerboard, solvePnP y paso al sistema del mundo
   fusion.py         caja, voxel, plano del tablero, outliers, DBSCAN, Poisson y medición
+  icp_experiment.py  comparación ChArUco / ChArUco + ICP, métricas y salidas separadas
   aruco.py          módulo de la cátedra (tutorial 7)
   calib.py          módulo de la cátedra (tutorial 6)
   run_pipeline.py   pasos de calibración y reconstrucción + figuras (los usa el notebook)
@@ -126,8 +127,8 @@ Un peluche sobre un ChArUco de 9x13 (`DICT_5X5_100`, cuadrado de 42 mm, marcador
 - Puntos: 99.7 M, caja 13.1 M, voxel 1.19 M, sin plano 0.42 M, sin outliers 0.39 M, cluster 0.36 M.
 - `reconstruction.ply`: 9.8 MB. `reconstruction_mesh.ply`: 7.7 MB.
 - Medición: alto ≈ 133 mm sobre el plano del tablero, ancho X ≈ 144 mm y profundidad
-  Y ≈ 212 mm (incluye la cola, que está estirada). No medimos el peluche con regla, así que
-  todavía no hay error relativo: si se carga `real_height_mm` en la config, se calcula solo.
+  Y ≈ 212 mm (incluye la cola, que está estirada). La altura real del peluche sentado es
+  140 mm, por lo que el error relativo del alto es aproximadamente 4.7%.
 
 ### Problema que encontramos (y cómo lo corregimos)
 
@@ -151,5 +152,42 @@ vistas, se saca entero con RANSAC y la nube final queda limpia.
 Lo que se podría mejorar:
 
 - Sacar las fotos con la cámara apoyada y quieta, para no tener que corregir cada vista.
-- Alinear las vistas con ICP para afinar los bordes, que todavía se ven algo borrosos.
-- Medir el peluche con regla para tener el error relativo.
+- Evaluar el refinamiento con ICP de la sección 8, incluyendo los bordes y las medidas finales.
+- Repetir la medición física varias veces para estimar también su incertidumbre.
+
+## Refinamiento con ICP
+
+La sección 8 del notebook compara las poses de ChArUco con un refinamiento ICP punto a plano.
+El registro usa copias recortadas del objeto, sin el tablero y con voxels de 3 mm. La primera
+vista utilizable queda fija y las siguientes se alinean contra las vistas aceptadas acumuladas.
+La corrección se aplica antes de fusionar, tanto a los puntos como a la pose de la cámara.
+
+El bloque `icp` de `configs/grupo.yaml` contiene los parámetros. La corrida base mantiene
+`enabled: false`; la sección de comparación lo activa automáticamente. Sólo se aceptan ajustes
+pequeños con suficiente solapamiento y mejora del RMSE, también sobre los mismos puntos
+inicialmente solapados, actualizando sus vecinos sin excluir puntos por distancia. Las vistas
+rechazadas conservan su pose de ChArUco y no amplían la referencia
+de registro. No se realiza cierre de ciclo, por lo que puede acumularse deriva.
+
+Los resultados se guardan en `output/<dataset>/icp/`: `metrics.json` contiene métricas por vista,
+motivos de aceptación/rechazo, transformaciones y medidas; `figures/08_icp_comparacion.png`
+compara ambas nubes con las mismas escalas. También se exportan `reconstruction_before_icp.ply`,
+`reconstruction_icp.ply` y, si está habilitada, `reconstruction_mesh_icp.ply`.
+Ambas variantes usan los mismos filtros y el mismo plano de apoyo para la medición.
+
+El notebook muestra los resultados guardados si existen. Para volver a ejecutar la comparación,
+poner `RECALCULAR_ICP = True` en la sección 8; también hay que hacerlo si cambian las imágenes,
+la calibración o los filtros. En la corrida incluida se aceptaron 30 de 57 intentos (la primera
+de las 58 vistas queda fija). El RMSE medio en las vistas aceptadas pasó de 2.27 a 1.82 mm.
+La altura pasó de 133.4 a 132.0 mm. Frente a los 140 mm reales, el error relativo pasó
+de 4.7% a 5.7%; en esta medida, la reconstrucción base quedó más cerca del valor real.
+
+Para ejecutar sólo este experimento, con la calibración base ya generada:
+
+```bash
+python pipeline/icp_experiment.py --config configs/grupo.yaml
+```
+
+Se reutilizan las disparidades de `intermediate/`. Si no existen, se calculan con el método
+elegido; CREStereo necesita el modelo indicado en Instalación. Un RMSE de registro menor no
+prueba por sí solo mayor exactitud: hay que revisar la geometría y contrastar las medidas reales.

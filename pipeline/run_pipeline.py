@@ -13,7 +13,7 @@ import open3d as o3d
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import calib  # módulo de la cátedra (tutorial 6)
+import calib
 import calibration as stereo_calib
 import fusion
 import pose as pose_mod
@@ -22,18 +22,13 @@ from dataset import list_stereo_pairs, read_checkerboard_txt, read_markers_yaml
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Mundo con Z hacia arriba: rotación de 180° sobre X respecto del marco del tablero
-# de OpenCV (que tiene Z entrando a la mesa).
 FLIP_Z_UP = np.diag([1.0, -1.0, -1.0, 1.0])
 
 
 def resolve(path):
+    """Resuelve una ruta relativa desde la raíz del repositorio."""
     return path if os.path.isabs(path) else os.path.join(REPO_ROOT, path)
 
-
-# ---------------------------------------------------------------------------
-# figuras
-# ---------------------------------------------------------------------------
 
 def save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts, path):
     """Detección de corners en un par de calibración."""
@@ -66,12 +61,11 @@ def save_per_view_errors_figure(calibration, path, threshold=None):
     if threshold:
         ax.axhline(threshold, color="tab:red", linestyle=":",
                    label=f"umbral para descartar = {threshold} px")
-    step = max(1, len(used) // 10)  # con muchos pares, una etiqueta cada `step`
+    step = max(1, len(used) // 10)
     ax.set_xticks(x[::step], [str(u) for u in used[::step]])
     ax.set_xlim(-1, len(used))
     ax.set_xlabel("par de calibración")
     ax.set_ylabel("error de reproyección [px]")
-    # leyenda arriba, afuera del gráfico, para que no tape las barras altas
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=130, bbox_inches="tight")
@@ -79,6 +73,7 @@ def save_per_view_errors_figure(calibration, path, threshold=None):
 
 
 def save_rectification_figure(left, right, left_r, right_r, path, n_lines=8):
+    """Guarda una comparación del par original y rectificado."""
     fig, axes = plt.subplots(2, 2, figsize=(16, 9))
     h = left.shape[0]
     for ax, img, title in zip(
@@ -97,6 +92,7 @@ def save_rectification_figure(left, right, left_r, right_r, path, n_lines=8):
 
 
 def save_disparity_figure(left_r, disparity, path, title="disparidad [px]"):
+    """Guarda la imagen izquierda junto con su mapa de disparidad."""
     fig, axes = plt.subplots(1, 2, figsize=(16, 5))
     axes[0].imshow(cv2.cvtColor(left_r, cv2.COLOR_BGR2RGB))
     axes[0].set_title("left rectificada")
@@ -151,7 +147,6 @@ def frustum_lines(T_world_cam, K, image_size, depth):
     """Segmentos 3D de una cámara dibujada como pirámide (centro + plano imagen a `depth` mm)."""
     w, h = image_size
     pixels = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=float)
-    # rayo de cada esquina de la imagen, escalado a Z = depth (sistema cámara)
     corners = np.c_[(pixels - K[:2, 2]) / np.diag(K)[:2], np.ones(4)] * depth
     corners = corners @ T_world_cam[:3, :3].T + T_world_cam[:3, 3]
     center = T_world_cam[:3, 3]
@@ -161,6 +156,7 @@ def frustum_lines(T_world_cam, K, image_size, depth):
 
 
 def save_poses_figure(pcd, poses_world, path, K, image_size, max_points=40000):
+    """Guarda la nube junto con las poses estimadas de las cámaras."""
     pts = np.asarray(pcd.points)
     cols = np.asarray(pcd.colors)
     if len(pts) > max_points:
@@ -172,13 +168,12 @@ def save_poses_figure(pcd, poses_world, path, K, image_size, max_points=40000):
     ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=cols, s=0.5)
     centers = np.array([T[:3, 3] for T in poses_world])
     ax.plot(centers[:, 0], centers[:, 1], centers[:, 2], "b.-", label="cámaras")
-    label_step = max(1, len(poses_world) // 12)  # numeramos solo algunas para que no se pisen
+    label_step = max(1, len(poses_world) // 12)
     for i, T in enumerate(poses_world):
         for a, b in frustum_lines(T, K, image_size, depth=15):
             ax.plot(*np.c_[a, b], color="r", linewidth=0.5)
         if i % label_step == 0:
             ax.text(*(T[:3, 3] + [0, 0, 12]), str(i), fontsize=8, ha="center")
-    # ejes del mundo
     for v, color in zip(np.eye(3) * 100, "rgb"):
         ax.quiver(0, 0, 0, *v, color=color, linewidth=2)
     ax.set_xlabel("X [mm]"); ax.set_ylabel("Y [mm]"); ax.set_zlabel("Z [mm]")
@@ -190,6 +185,7 @@ def save_poses_figure(pcd, poses_world, path, K, image_size, max_points=40000):
 
 
 def save_cloud_views(pcd, path, title, max_points=60000):
+    """Guarda vistas ortogonales de una nube de puntos."""
     pts = np.asarray(pcd.points)
     cols = np.asarray(pcd.colors)
     if len(pts) > max_points:
@@ -259,11 +255,8 @@ def save_mesh_figure(mesh, path, max_triangles=60000):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
-# pipeline
-# ---------------------------------------------------------------------------
-
 def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
+    """Ejecuta la calibración estéreo y guarda sus resultados."""
     print("\n[4.1] Calibración y rectificación estéreo")
     calib_dir = os.path.join(dataset_dir, "calib")
 
@@ -282,8 +275,6 @@ def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
         save_checkerboard_figure(calib_dir, checkerboard, used, left_pts, right_pts,
                                  os.path.join(fig_dir, "00_deteccion_checkerboard.png"))
 
-        # Opcional: sacar los pares que calibraron mal (foto movida, tablero muy inclinado)
-        # y volver a calibrar sin ellos.
         max_error = cfg.get("max_view_error_px")
         save_per_view_errors_figure(calibration, os.path.join(fig_dir, "00_error_por_vista.png"),
                                     threshold=max_error)
@@ -313,7 +304,6 @@ def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
     stereo_calib.save_pickle(calibration, os.path.join(out_dir, "stereo_calibration.pkl"))
     stereo_calib.save_pickle(maps, os.path.join(out_dir, "stereo_maps.pkl"))
 
-    # figura original vs rectificada (un par de calibración)
     pairs = list_stereo_pairs(calib_dir)
     if pairs:
         _, lf, rf = pairs[len(pairs) // 2]
@@ -326,6 +316,7 @@ def step_calibration(cfg, dataset_dir, out_dir, fig_dir):
 
 
 def method_name(cfg):
+    """Devuelve el nombre del método de disparidad configurado."""
     return "CREStereo" if cfg.get("disparity_method", "sgbm") == "crestereo" else "SGBM"
 
 
@@ -336,8 +327,6 @@ def compute_disparity(cfg, left_r, right_r, idx, inter_dir):
                                         cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY), cfg.get("sgbm"))
 
     cre = cfg.get("crestereo", {})
-    # El nombre del cache depende del par rectificado: si cambia la calibración (y por lo
-    # tanto la rectificación), no se reutiliza una disparidad vieja por error.
     image_hash = hashlib.md5(left_r.tobytes() + right_r.tobytes()).hexdigest()[:10]
     cache = os.path.join(inter_dir, f"disp_crestereo_{idx}_{image_hash}.npy")
     if os.path.exists(cache):
@@ -350,35 +339,38 @@ def compute_disparity(cfg, left_r, right_r, idx, inter_dir):
     return disparity
 
 
-def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
+def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir, comparison=None):
+    """Reconstruye y fusiona las vistas del objeto."""
     print("\n[4.2] Disparidad, nube local y pose de cada captura")
     captures_dir = os.path.join(dataset_dir, "captures")
     markers = read_markers_yaml(os.path.join(captures_dir, "markers.yaml"))
     board = pose_mod.make_charuco_board(markers) if markers["type"] == "charuco" else None
     print("  objeto de referencia:", markers)
 
-    K_rect = maps["P1"][:, :3]  # intrínseca de la cámara izquierda rectificada
+    K_rect = maps["P1"][:, :3]
     Q = maps["Q"]
     axis_len = (markers.get("square_length") or markers.get("square_size")) * 3
 
     all_points, all_colors = [], []
     poses_world, per_view = [], []
+    icp_params = cfg.get("icp") or {}
+    use_icp = icp_params.get("enabled", False)
+    target = o3d.geometry.PointCloud()
+    baseline_points, baseline_colors, baseline_poses = [], [], []
+    os.makedirs(fig_dir, exist_ok=True)
+    os.makedirs(inter_dir, exist_ok=True)
 
     for n, (idx, lf, rf) in enumerate(list_stereo_pairs(captures_dir)):
         left, right = cv2.imread(lf), cv2.imread(rf)
         left_r, right_r = stereo_calib.rectify_pair(left, right, maps)
 
-        # 1. stereo matching
         disparity = compute_disparity(cfg, left_r, right_r, idx, inter_dir)
 
-        # 2. pose global con solvePnP sobre la imagen izquierda rectificada
         p = pose_mod.estimate_pose(left_r, markers, K_rect, board=board)
         if p is None:
             print(f"  captura {idx}: no se detectó el objeto de referencia, se descarta")
             continue
 
-        # 2b. opcional: corregir la disparidad de esta vista para que el tablero quede
-        #     a la profundidad que da PnP (ver stereo.board_disparity_correction)
         correction = None
         if cfg.get("board_disparity_correction") and "object_points" in p:
             correction = stereo.board_disparity_correction(
@@ -386,17 +378,45 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
             if correction is not None:
                 disparity = stereo.apply_disparity_correction(disparity, *correction[:2])
 
-        # 3. nube local (cámara izquierda rectificada)
         points, colors = stereo.disparity_to_points(
             disparity, Q, left_r, z_range=cfg.get("z_range", (50, 2000))
         )
 
-        # 4. local -> mundo
         T_world_cam = FLIP_Z_UP @ pose_mod.pose_to_matrix(p["rvec"], p["tvec"])
         world_points = pose_mod.transform_points(points, T_world_cam)
 
+        icp_info = None
+        if use_icp:
+            world_cloud = fusion.make_pcd(world_points, colors)
+            source = fusion.prepare_icp_cloud(world_cloud, cfg["box_min"], cfg["box_max"], icp_params)
+            if comparison is not None:
+                baseline, _ = fusion.crop_box(world_cloud, cfg["box_min"], cfg["box_max"])
+                baseline_points.append(np.asarray(baseline.points).copy())
+                baseline_colors.append(np.asarray(baseline.colors).copy())
+                baseline_poses.append(T_world_cam.copy())
+            if len(target.points) == 0:
+                delta = np.eye(4)
+                _, icp_info = fusion.refine_with_icp(source, target, icp_params)
+                if len(source.points) >= icp_params.get("min_points", 100):
+                    target = o3d.geometry.PointCloud(source)
+                    icp_info["reason"] = "referencia fija"
+            else:
+                delta, icp_info = fusion.refine_with_icp(source, target, icp_params)
+                if icp_info["accepted"]:
+                    source.transform(delta)
+                    target = (target + source).voxel_down_sample(icp_params.get("voxel_size", 3.0))
+            world_cloud.transform(delta)
+            T_world_cam = delta @ T_world_cam
+            world_cloud, _ = fusion.crop_box(world_cloud, cfg["box_min"], cfg["box_max"])
+            world_points = np.asarray(world_cloud.points).copy()
+            output_colors = np.asarray(world_cloud.colors).copy()
+            icp_info["delta_T"] = delta.tolist()
+            print(f"  ICP captura {idx}: {icp_info['reason']}")
+        else:
+            output_colors = colors
+
         all_points.append(world_points)
-        all_colors.append(colors)
+        all_colors.append(output_colors)
         poses_world.append(T_world_cam)
         per_view.append({
             "idx": idx, "points": len(points), "pose_method": p["method"],
@@ -404,6 +424,7 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
             "camera_center_mm": T_world_cam[:3, 3].round(1).tolist(),
             "disparity_scale": correction[0] if correction else None,
             "disparity_offset_px": correction[1] if correction else None,
+            "icp": icp_info,
         })
         fix = f" | disp. corregida: x{correction[0]:.3f} {correction[1]:+.1f}px" if correction else ""
         print(f"  captura {idx:>2}: {len(points):>8,} pts | pose {p['method']} "
@@ -416,7 +437,6 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
             save_disparity_figure(left_r, disparity, os.path.join(fig_dir, "03_disparidad.png"),
                                   title=f"disparidad {method_name(cfg)} [px]")
             if method_name(cfg) == "CREStereo":
-                # comparación con el método clásico, para el informe
                 sgbm = stereo.compute_disparity(cv2.cvtColor(left_r, cv2.COLOR_BGR2GRAY),
                                                 cv2.cvtColor(right_r, cv2.COLOR_BGR2GRAY), cfg.get("sgbm"))
                 save_disparity_comparison(left_r, sgbm, disparity,
@@ -426,5 +446,10 @@ def step_reconstruction(cfg, dataset_dir, maps, fig_dir, inter_dir):
             local = fusion.make_pcd(points, colors).voxel_down_sample(2.0)
             o3d.io.write_point_cloud(os.path.join(inter_dir, "local_cloud_0.ply"), local)
 
+    if not all_points:
+        raise ValueError("No hay capturas con una pose válida para reconstruir.")
+    if use_icp and comparison is not None:
+        comparison["before"] = fusion.make_pcd(np.vstack(baseline_points), np.vstack(baseline_colors))
+        comparison["poses_before"] = baseline_poses
     pcd = fusion.make_pcd(np.vstack(all_points), np.vstack(all_colors))
     return pcd, poses_world, per_view, K_rect
